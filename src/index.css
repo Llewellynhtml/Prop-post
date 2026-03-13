@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Montserrat", serif;
+  --font-mono: "Montserrat", ui-monospace, SFMono-Regular, monospace;
+  --font-heading: "Montserrat", sans-serif;
+
+  --color-brand-teal: #1E97AB;
+  --color-brand-dark-teal: #359288;
+  --color-brand-green: #518E58;
+  --color-brand-light-teal: #A6D3C8;
+  --color-brand-white: #FEFEFE;
+}
+
+/* Premium Custom Scrollbar */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 100px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(30, 151, 171, 0.3);
+    border: 0px solid transparent;
+  }
+
+  /* For Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-teal);
+  box-shadow: 0 0 10px var(--color-brand-teal);
+}
