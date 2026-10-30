@@ -470,15 +470,18 @@ export const initDb = () => {
     });
   }
 
-  // Seed default admin user if no users exist
+  // Bootstrap only with explicit, server-side credentials.
   const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get() as { count: number };
-  if (userCount.count === 0) {
-    const passwordHash = bcrypt.hashSync("admin123", 10);
+  if (userCount.count === 0 && process.env.BOOTSTRAP_ADMIN_EMAIL && process.env.BOOTSTRAP_ADMIN_PASSWORD) {
+    if (process.env.BOOTSTRAP_ADMIN_PASSWORD.length < 12) {
+      throw new Error("BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters");
+    }
+    const passwordHash = bcrypt.hashSync(process.env.BOOTSTRAP_ADMIN_PASSWORD, 12);
     db.prepare(`
       INSERT INTO users (agency_id, name, email, password_hash, role)
       VALUES (?, ?, ?, ?, ?)
-    `).run(defaultAgencyId, "System Admin", "admin@proppost.co.za", passwordHash, "admin");
-    console.log("Default admin user created: admin@proppost.co.za / admin123");
+    `).run(defaultAgencyId, "System Admin", process.env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase().trim(), passwordHash, "admin");
+    console.log("Initial administrator created from secure environment configuration");
   }
 };
 
