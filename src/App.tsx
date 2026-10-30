@@ -53,10 +53,14 @@ function AppContent() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const fetchData = async () => {
     if (!token) return;
+    setDashboardLoading(true);
+    setDashboardError(null);
     try {
       const headers = {
         'Authorization': `Bearer ${token}`
@@ -98,6 +102,9 @@ function AppContent() {
       setDashboardData(dashboardData);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setDashboardError("The agency API could not return all dashboard data.");
+    } finally {
+      setDashboardLoading(false);
     }
   };
 
@@ -122,6 +129,8 @@ function AppContent() {
           topProperties={dashboardData?.topProperties || []} 
           leadsPerAgent={dashboardData?.leadsPerAgent || []} 
           recentActivity={dashboardData?.recentActivity || []}
+          dataError={dashboardError}
+          dataLoading={dashboardLoading}
           onNavigate={setView} 
         />
       );
@@ -150,6 +159,8 @@ function AppContent() {
           topProperties={dashboardData?.topProperties || []} 
           leadsPerAgent={dashboardData?.leadsPerAgent || []} 
           recentActivity={dashboardData?.recentActivity || []}
+          dataError={dashboardError}
+          dataLoading={dashboardLoading}
           onNavigate={setView} 
         />
       );
