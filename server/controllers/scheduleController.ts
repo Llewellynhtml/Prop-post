@@ -43,7 +43,7 @@ export const postScheduledNow = async (req: AuthRequest, res: Response) => {
     await scheduleService.postNow(id, agencyId);
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(501).json({ error: error.message });
   }
 };
 
