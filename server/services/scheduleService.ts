@@ -51,18 +51,10 @@ export const scheduleService = {
   },
 
   postNow: async (id: string | number, agencyId: string) => {
-    // Verify ownership
     const post = db.prepare("SELECT id FROM scheduled_posts WHERE id = ? AND agency_id = ?").get(id, agencyId);
     if (!post) throw new Error("Post not found");
-
-    // For "Post Now", we can just trigger the job immediately in BullMQ
-    try {
-      await schedulerService.schedulePost(Number(id), new Date());
-      return true;
-    } catch (error) {
-      console.error(`Failed to trigger post ${id} now:`, error);
-      throw error;
-    }
+    // Do not accept an immediate publishing request until a real provider is connected.
+    throw new Error("Direct publishing is not configured. Export the post for manual publishing.");
   },
 
   reschedule: async (id: string | number, date: string, time: string, agencyId: string) => {
