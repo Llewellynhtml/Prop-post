@@ -1,7 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import db from '../config/db.js';
-import { metricsService } from '../services/metricsService.js';
 
 export const publishPost = async (postId: number) => {
   const post = db.prepare("SELECT * FROM scheduled_posts WHERE id = ?").get(postId) as any;
@@ -11,39 +10,16 @@ export const publishPost = async (postId: number) => {
   }
 
   try {
-    // Mock publishing logic
-    const platforms = JSON.parse(post.platforms);
-    console.log(`[Publish] Publishing post ${postId} to: ${platforms.join(', ')}`);
-    
-    // Simulate network latency/API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Update database on success
+    // Publishing integrations are not connected. Never mark unsubmitted posts as posted.
+    const errorMessage = "Automatic publishing is not configured; no post was sent.";
     db.prepare(`
-      UPDATE scheduled_posts 
-      SET status = 'posted', 
-          publish_status = 'success',
-          attempts = attempts + 1,
-          last_attempt = CURRENT_TIMESTAMP,
-          failure_reason = NULL
+      UPDATE scheduled_posts
+      SET publish_status = 'not_configured', failure_reason = ?,
+          attempts = attempts + 1, last_attempt = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(postId);
-
-    // Add to history for tracking
-    const brand = db.prepare("SELECT id FROM branding LIMIT 1").get() as { id: number };
-    const insertHistory = db.prepare(`
-      INSERT INTO history (property_id, agent_id, brand_id, platform, aspect_ratio, style, thumbnail_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    platforms.forEach((p: string) => {
-      insertHistory.run(post.property_id, post.agent_id, brand?.id || 1, p, '1:1', 'Modern', post.image_url);
-    });
-
-    // Update property marketing score
-    metricsService.updateMetrics(post.property_id);
-
-    console.log(`[Publish] Successfully published post ${postId}`);
+    `).run(errorMessage, postId);
+    console.warn(`[Publish] Post ${postId} skipped: ${errorMessage}`);
+    return;
   } catch (error: any) {
     console.error(`[Publish] Failed to publish post ${postId}: ${error.message}`);
     
