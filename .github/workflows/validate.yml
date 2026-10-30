@@ -1,0 +1,28 @@
+name: Validate Prop-post
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/proppost-v2-phase1
+      - feature/proppost-v2-phase2-dashboard
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npm run lint
+      - name: Production frontend build
+        run: npm run build
