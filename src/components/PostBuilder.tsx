@@ -178,7 +178,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
       const agent = agents.find(a => a.id === config.agentId) || agents[0];
       if (!agent) throw new Error("Agent not found");
 
-      const generatedData = await postGenerator.generate(property, agent, platform);
+      const generatedData = await postGenerator.generate(property, agent, platform, token || "");
       
       setConfig(prev => ({
         ...prev,
