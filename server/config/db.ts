@@ -384,9 +384,8 @@ export const initDb = () => {
     });
   }
 
-  // Seed Templates (Wipe first to ensure exactly 2 as requested)
-  db.prepare("DELETE FROM templates").run();
-  db.prepare("DELETE FROM sqlite_sequence WHERE name='templates'").run();
+  // Preserve user-created templates on startup.
+  const templateCount = db.prepare("SELECT COUNT(*) AS count FROM templates").get() as { count: number };
   const insertTemplate = db.prepare(`
     INSERT INTO templates (agency_id, name, category, style_theme, supported_formats, thumbnail_url, description, tags, listing_status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -397,7 +396,7 @@ export const initDb = () => {
     [defaultAgencyId, "Exclusive Living Flyer", "for_sale", "luxury", JSON.stringify(["1200x630", "16:9"]), "https://picsum.photos/seed/exclusive/1100/620", "Exclusive, Luxury, Gold, Navy", "for_sale", "active"]
   ];
 
-  templates.forEach(t => insertTemplate.run(...t));
+  if (templateCount.count === 0) templates.forEach(t => insertTemplate.run(...t));
 
   // Seed Analytics and more Leads if empty
   const analyticsCount = db.prepare("SELECT COUNT(*) as count FROM post_analytics").get() as { count: number };
