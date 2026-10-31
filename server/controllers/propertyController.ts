@@ -42,7 +42,8 @@ export const updateProperty = (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const agencyId = req.user?.agency_id;
     if (!agencyId) return res.status(401).json({ error: "Unauthorized" });
-    propertyService.update(id, req.body, agencyId);
+    const updated = propertyService.update(id, req.body, agencyId);
+    if (!updated) return res.status(404).json({ error: 'Property not found' });
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
