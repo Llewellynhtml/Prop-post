@@ -6,17 +6,36 @@ await mkdir('artifacts/responsive', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const issues = [];
 const jwt = ['eyJhbGciOiJIUzI1NiJ9', Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, sub: 'ui-test' })).toString('base64url'), 'ui-test'].join('.');
+const assetOrigin = 'https://media.proppost-fixtures.invalid';
+const imageUrl = `${assetOrigin}/property.svg`;
+const logoUrl = `${assetOrigin}/logo.svg`;
+const agentUrl = `${assetOrigin}/agent.svg`;
+const images = {
+  '/property.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700"><rect width="900" height="700" fill="#a6cad6"/><rect x="0" y="500" width="900" height="200" fill="#77a568"/><rect x="100" y="240" width="700" height="310" fill="#f3e7cf"/><path d="M65 260 L450 80 L835 260" fill="#594536"/><rect x="410" y="350" width="140" height="200" fill="#514f4e"/><rect x="185" y="330" width="150" height="100" fill="#436b82"/><rect x="640" y="330" width="110" height="100" fill="#436b82"/></svg>',
+  '/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="360" height="130"><rect width="360" height="130" rx="12" fill="#102f33"/><text x="180" y="77" text-anchor="middle" font-family="Arial" font-size="42" font-weight="bold" fill="#ffffff">TEST AGENCY</text></svg>',
+  '/agent.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" fill="#ddedea"/><circle cx="80" cy="58" r="30" fill="#b18b70"/><path d="M20 160 C20 90 140 90 140 160" fill="#415e68"/></svg>'
+};
 const fixtureProperty = {
-  id: 7, title: 'Test Townhouse', price: 1850000, currency: 'ZAR', listing_type: 'sale',
+  id: 7, title: 'Spacious Three-Bedroom Townhouse With Landscaped Courtyard, Secure Parking and Exceptional Natural Light', price: 1850000, currency: 'ZAR', listing_type: 'sale',
   status: 'available', location_city: 'Kimberley', location_area: 'New Park',
   bedrooms: 3, bathrooms: 2, parking: 2, floor_size_m2: 140, short_description: 'Test home',
-  images: [], amenities: [], created_at: '2026-10-01', updated_at: '2026-10-01'
+  images: [{ id: 1, property_id: 7, image_url: imageUrl, sort_order: 0, is_hero: true }], amenities: [], created_at: '2026-10-01', updated_at: '2026-10-01'
 };
 const routes = {
   '/api/properties': [fixtureProperty],
-  '/api/properties/7/full': { ...fixtureProperty, defaults: { defaultSelectedImages: [], defaultAmenitiesToShow: [], defaultHeadline: 'Test Townhouse', defaultCaption: 'Explore this townhouse' } },
-  '/api/agents': [],
-  '/api/branding': [],
+  '/api/properties/7/full': { ...fixtureProperty, defaults: { defaultSelectedImages: [imageUrl], defaultAmenitiesToShow: [], defaultHeadline: fixtureProperty.title, defaultCaption: 'Explore this townhouse' } },
+  '/api/agents': [{
+    id: 8, full_name: 'Sam Example', email: 'sam@example.invalid',
+    cellphone_number: '082 000 0000', whatsapp_number: '27820000000',
+    profile_photo_url: agentUrl, role_optional: 'Property Consultant'
+  }],
+  '/api/branding': [{
+    id: 9, company_name: 'Test Agency', logo_url: logoUrl,
+    primary_color_hex: '#126d62', secondary_color_hex: '#263d40',
+    accent_color_hex: '#143c47', background_color_hex: '#ffffff',
+    heading_font_family: 'Arial', body_font_family: 'Arial',
+    website_url: 'example.invalid', default_cta_text: 'Book a viewing'
+  }],
   '/api/amenities': [],
   '/api/history': [],
   '/api/scheduled_posts': [],
@@ -30,6 +49,15 @@ async function prepare(page, failed = false) {
     localStorage.setItem('proppost_token', token);
     localStorage.setItem('proppost_user', JSON.stringify({ id: 100, name: 'Test Agent', email: 'testing@example.invalid', role: 'admin' }));
   }, { token: jwt });
+  await page.route(`${assetOrigin}/**`, async route => {
+    const pathname = new URL(route.request().url()).pathname;
+    const body = images[pathname];
+    return route.fulfill({ status: body ? 200 : 404, body: body || 'Missing fixture', headers: {
+      'content-type': 'image/svg+xml',
+      'access-control-allow-origin': '*',
+      'cross-origin-resource-policy': 'cross-origin'
+    } });
+  });
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (failed) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Unavailable test fixture' }) });
@@ -85,7 +113,15 @@ async function testWidth(width, height) {
     await page.getByRole('button', { name: /Instagram.*Stories, Reels/i }).click();
     await page.getByRole('button', { name: /Post \(4:5\)/i }).click();
     await page.getByRole('button', { name: /Test Townhouse/i }).click();
-    await page.getByText('Test Townhouse', { exact: true }).first().waitFor();
+    await page.getByText(/Spacious Three-Bedroom Townhouse/).first().waitFor();
+    await page.getByLabel('Agency logo').check();
+    await page.getByLabel('Agent details').check();
+    await page.getByRole('button', { name: 'Select agent' }).click();
+    await page.getByRole('button', { name: /Sam Example/i }).click();
+    const flyer = page.locator('[data-testid="flyer-canvas"]');
+    await flyer.getByAltText('Test Agency logo').waitFor();
+    await flyer.getByAltText('Selected property').waitFor();
+    await flyer.getByText('Sam Example').waitFor();
     for (const format of ['PNG', 'JPEG', 'PDF']) {
       const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
       await page.getByRole('button', { name: `Download flyer as ${format}` }).click();
