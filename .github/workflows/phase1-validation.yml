@@ -1,0 +1,24 @@
+name: Phase 1 backend security checks
+on:
+  push:
+    branches: [feature/proppost-v2-phase1]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: TypeScript check
+        run: npm run lint
+      - name: Production frontend build
+        run: npm run build
+      - name: Tenant isolation and persistence regression tests
+        run: npx tsx tests/phase1-security.mts
