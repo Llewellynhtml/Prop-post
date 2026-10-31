@@ -89,7 +89,10 @@ async function testWidth(width, height) {
     for (const format of ['PNG', 'JPEG', 'PDF']) {
       const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
       await page.getByRole('button', { name: `Download flyer as ${format}` }).click();
-      const download = await downloadPromise;
+      const download = await downloadPromise.catch(async error => {
+        const status = await page.locator('[role="status"]').allTextContents();
+        throw new Error(`No ${format} download: ${error.message}; UI status: ${status.join(' | ')}`);
+      });
       const filename = download.suggestedFilename();
       const expected = format === 'JPEG' ? '.jpg' : `.${format.toLowerCase()}`;
       if (!filename.endsWith(expected)) issues.push(`Unexpected ${format} filename: ${filename}`);
