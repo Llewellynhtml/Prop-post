@@ -1079,7 +1079,8 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
                   setConfig({
                     ...config, 
                     templateId: t.id,
-                    layoutStyle: t.style_theme.charAt(0).toUpperCase() + t.style_theme.slice(1) as any
+                    layoutStyle: t.style_theme.charAt(0).toUpperCase() + t.style_theme.slice(1) as any,
+                    previewLayout: t.style_theme === 'minimal' ? 'minimal' : t.style_theme === 'luxury' ? 'classic' : 'editorial'
                   });
                   setIsLibraryOpen(false);
                 }}
@@ -1300,6 +1301,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         platformLabel={selectedFormat?.platform}
         onEditContent={() => setStep(3)}
         onSelectMedia={() => setStep(4)}
+        onUpdateConfig={(next) => setConfig(previous => ({ ...previous, ...next }))}
       />
       </div>
     </div>
