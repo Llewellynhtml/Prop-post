@@ -10,11 +10,12 @@ interface Props {
   platformLabel?: string;
   onEditContent: () => void;
   onSelectMedia: () => void;
+  onUpdateConfig: (next: Partial<PostConfig>) => void;
 }
 const ratioMap: Record<string, string> = { '1:1': '1 / 1', '4:5': '4 / 5', '9:16': '9 / 16', '1.91:1': '1.91 / 1', '16:9': '16 / 9', '1200x630': '1.91 / 1' };
 const safeColor = (value: string | undefined, fallback: string) => value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
 
-export default function StudioPreview({ config, property, agent, branding, platformLabel, onEditContent, onSelectMedia }: Props) {
+export default function StudioPreview({ config, property, agent, branding, platformLabel, onEditContent, onSelectMedia, onUpdateConfig }: Props) {
   const hero = config.selectedImages[0] || property?.images?.[0]?.image_url;
   const accent = safeColor(branding?.primary_color_hex, '#0e8278');
   const secondary = safeColor(branding?.accent_color_hex, '#1f2937');
@@ -70,6 +71,26 @@ export default function StudioPreview({ config, property, agent, branding, platf
       <div className="flex items-center justify-between text-xs"><span className="text-slate-500">Channel</span><strong className="text-slate-800">{platformLabel || 'Not selected'}</strong></div>
       <div className="flex items-center justify-between text-xs"><span className="text-slate-500">Media selected</span><strong className="text-slate-800">{config.selectedImages.length}</strong></div>
       <p className="text-[11px] text-slate-500">Layout: <span className="font-semibold capitalize text-slate-700">{layout}</span> · {branding?.company_name || 'Agency brand not configured'}</p>
+      <div className="space-y-3 border-t border-slate-100 pt-3">
+        <label htmlFor="studio-layout" className="block text-[11px] font-bold text-slate-600">Flyer layout</label>
+        <select id="studio-layout" value={layout} onChange={event => onUpdateConfig({ previewLayout: event.target.value as PostConfig['previewLayout'] })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:outline-teal-600">
+          <option value="editorial">Editorial · photo first</option>
+          <option value="classic">Classic · dark luxury</option>
+          <option value="minimal">Minimal · clean layout</option>
+        </select>
+        <label htmlFor="studio-format" className="block text-[11px] font-bold text-slate-600">Preview format</label>
+        <select id="studio-format" value={format} onChange={event => onUpdateConfig({ activePreviewPlatform: event.target.value as PostConfig['activePreviewPlatform'] })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:outline-teal-600">
+          {(['1:1','4:5','9:16','1.91:1','16:9','1200x630'] as const).map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <div className="grid grid-cols-2 gap-3 text-xs text-slate-700">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={showLogo} onChange={event => onUpdateConfig({ showLogo: event.target.checked })}/> Agency logo</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={showAgent} onChange={event => onUpdateConfig({ showAgent: event.target.checked })}/> Agent details</label>
+        </div>
+        <label htmlFor="studio-logo-placement" className="block text-[11px] font-bold text-slate-600">Logo position</label>
+        <select id="studio-logo-placement" disabled={!showLogo} value={config.logoPosition || 'top-right'} onChange={event => onUpdateConfig({ logoPosition: event.target.value as PostConfig['logoPosition'] })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 disabled:opacity-50">
+          <option value="top-left">Top left</option><option value="top-right">Top right</option>
+        </select>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={onEditContent} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Edit content</button>
         <button type="button" onClick={onSelectMedia} className="rounded-xl bg-[#0e8278] px-3 py-2.5 text-xs font-bold text-white hover:bg-[#0a665e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Change media</button>
