@@ -60,7 +60,7 @@ async function testWidth(width, height) {
     await page.getByRole('button', { name: 'Expand sidebar' }).click();
   }
   // Property Marketing Studio: verify the three panels render without page overflow.
-  await page.getByRole('button', { name: 'Create post' }).first().click();
+  await page.getByRole('button', { name: /^Create(?: post)?$/ }).first().click();
   await page.getByRole('heading', { name: 'Live branded draft' }).waitFor();
   await page.getByRole('heading', { name: 'Property details' }).waitFor();
   await page.screenshot({ path: `artifacts/responsive/studio-${width}.png`, fullPage: true });
