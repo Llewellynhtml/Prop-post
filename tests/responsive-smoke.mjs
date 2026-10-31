@@ -112,7 +112,7 @@ async function testWidth(width, height) {
     // Choose a real fixture through the guided flow. Then verify every format is a real download.
     await page.getByRole('button', { name: /Instagram.*Stories, Reels/i }).click();
     await page.getByRole('button', { name: /Post \(4:5\)/i }).click();
-    await page.getByRole('button', { name: /Test Townhouse/i }).click();
+    await page.getByRole('button', { name: /Spacious Three-Bedroom Townhouse/i }).click();
     await page.getByText(/Spacious Three-Bedroom Townhouse/).first().waitFor();
     await page.getByLabel('Agency logo').check();
     await page.getByLabel('Agent details').check();
