@@ -183,6 +183,10 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
       if (!agent) throw new Error("Agent not found");
 
       const generatedData = await postGenerator.generate(property, agent, platform, token || "");
+      if (!generatedData || typeof generatedData.caption !== 'string' || !Array.isArray(generatedData.hashtags)) {
+        throw new Error('AI service returned an invalid marketing draft');
+      }
+      const safeHashtags = generatedData.hashtags.filter((tag: unknown): tag is string => typeof tag === 'string');
       
       setConfig(prev => ({
         ...prev,
@@ -190,7 +194,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         ctaOverride: generatedData.cta,
         selectedAmenities: property.amenities?.slice(0, 5).map(a => a.name) || [],
         agentId: agent.id,
-        captionOverride: `${generatedData.caption}\n\n${generatedData.hashtags.join(' ')}`
+        captionOverride: `${generatedData.caption}\n\n${safeHashtags.join(' ')}`
       }));
     } catch (error) {
       console.error("Error generating AI draft:", error);
