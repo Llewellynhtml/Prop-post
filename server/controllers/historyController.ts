@@ -1,5 +1,6 @@
 import { Response } from "express";
 import db from "../config/db.js";
+import { assertAgencyReferences } from "../services/tenantGuard.js";
 import { AuthRequest } from "../middleware/auth.js";
 
 export const getHistory = (req: AuthRequest, res: Response) => {
@@ -27,6 +28,12 @@ export const createHistory = (req: AuthRequest, res: Response) => {
     const agencyId = req.user?.agency_id;
     if (!agencyId) return res.status(401).json({ error: "Unauthorized" });
     const { property_id, agent_id, brand_id, template_id, platform, aspect_ratio, style, thumbnail_url } = req.body;
+    assertAgencyReferences(agencyId, [
+      { table: 'properties', id: property_id },
+      { table: 'agents', id: agent_id },
+      { table: 'branding', id: brand_id },
+      { table: 'templates', id: template_id }
+    ]);
     const result = db.prepare(`
       INSERT INTO history (agency_id, property_id, agent_id, brand_id, template_id, platform, aspect_ratio, style, thumbnail_url)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
