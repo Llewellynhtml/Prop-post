@@ -1,4 +1,5 @@
 import db from "../config/db.js";
+import { assertAgencyReferences } from "./tenantGuard.js";
 import { schedulerService } from "./scheduler.js";
 
 export const scheduleService = {
@@ -15,24 +16,21 @@ export const scheduleService = {
 
   create: async (data: any, agencyId: string) => {
     const { propertyId, agentId, propertyTitle, agentName, platforms, caption, imageURL, date, time } = data;
+    assertAgencyReferences(agencyId, [
+      { table: 'properties', id: propertyId },
+      { table: 'agents', id: agentId }
+    ]);
     const result = db.prepare(`
       INSERT INTO scheduled_posts (agency_id, property_id, agent_id, property_title, agent_name, platforms, caption, image_url, date, time, status, attempts, publish_status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(agencyId, propertyId, agentId, propertyTitle, agentName, JSON.stringify(platforms), caption, imageURL, date, time, 'scheduled', 0, 'pending');
+    `).run(agencyId, propertyId, agentId, propertyTitle, agentName, JSON.stringify(platforms), caption, imageURL, date, time, 'scheduled', 0, 'manual_required');
     
     const postId = Number(result.lastInsertRowid);
 
-    // Schedule the job in BullMQ
-    try {
-      const scheduledAt = new Date(`${date}T${time}`);
-      await schedulerService.schedulePost(postId, scheduledAt);
-    } catch (error) {
-      console.error(`Failed to add post ${postId} to queue:`, error);
-      // We still return the ID as it's in the DB, but maybe we should throw?
-      // For now, we'll just log it.
-    }
-
+    // These are calendar plans, not queued promises to publish.
+    // Do not enqueue an unsupported publishing operation.
     return postId;
+
   },
 
   delete: async (id: string | number, agencyId: string) => {
@@ -66,13 +64,11 @@ export const scheduleService = {
       // Update database
       db.prepare(`
         UPDATE scheduled_posts 
-        SET date = ?, time = ?, status = 'scheduled', publish_status = 'pending'
+        SET date = ?, time = ?, status = 'scheduled', publish_status = 'manual_required'
         WHERE id = ?
       `).run(date, time, id);
 
-      // Reschedule in BullMQ
-      const scheduledAt = new Date(`${date}T${time}`);
-      await schedulerService.schedulePost(Number(id), scheduledAt);
+      // Calendar planning only. Direct publishing is not connected.
       return true;
     } catch (error) {
       console.error(`Failed to reschedule post ${id}:`, error);
