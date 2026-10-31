@@ -114,8 +114,10 @@ async function testWidth(width, height) {
     await page.getByRole('button', { name: /Post \(4:5\)/i }).click();
     await page.getByRole('button', { name: /Spacious Three-Bedroom Townhouse/i }).click();
     await page.getByText(/Spacious Three-Bedroom Townhouse/).first().waitFor();
-    await page.getByLabel('Agency logo').check();
-    await page.getByLabel('Agent details').check();
+    await page.getByRole('heading', { name: 'Live branded draft' }).waitFor();
+    await page.waitForTimeout(800); // allow the wizard's motion transition to settle
+    await page.getByLabel('Agency logo').check({ force: true });
+    await page.getByLabel('Agent details').check({ force: true });
     await page.getByRole('button', { name: 'Select agent' }).click();
     await page.getByRole('button', { name: /Sam Example/i }).click();
     const flyer = page.locator('[data-testid="flyer-canvas"]');
