@@ -1,4 +1,5 @@
 import db from "../config/db.js";
+import { assertAgencyReferences } from "./tenantGuard.js";
 import { metricsService } from "./metricsService.js";
 
 export const leadService = {
@@ -64,6 +65,11 @@ export const leadService = {
     metadata?: any;
   }, agencyId: string) => {
     const { propertyId, postId, agentId, source, contactName, contactPhone, message, metadata } = data;
+    assertAgencyReferences(agencyId, [
+      { table: 'properties', id: propertyId },
+      { table: 'scheduled_posts', id: postId },
+      { table: 'agents', id: agentId }
+    ]);
     const result = db.prepare(`
       INSERT INTO leads (agency_id, property_id, post_id, agent_id, source, contact_name, contact_phone, message, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
