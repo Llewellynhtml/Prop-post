@@ -39,6 +39,7 @@ import { postGenerator } from '../services/postGenerator';
 import TemplatePreview from './TemplatePreview';
 import TemplateLibrary from './TemplateLibrary';
 import PageHeader from './PageHeader';
+import StudioPreview from './StudioPreview';
 
 interface Props {
   properties: Property[];
@@ -1047,7 +1048,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         }
       />
 
-      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:gap-6 relative">
+      <div className="flex min-w-0 flex-col gap-4 relative">
       <AnimatePresence>
         {isLibraryOpen && (
           <motion.div 
@@ -1089,7 +1090,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
       </AnimatePresence>
 
       {/* Left: Steps Rail */}
-      <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto rounded-2xl bg-white p-3 shadow-sm lg:w-20 lg:flex-col lg:overflow-visible lg:py-4">
+      <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(s => {
           const isVideo = selectedFormat?.type === 'video';
           const isSkipped = isVideo && [2].includes(s); // Only skip Template for video
@@ -1115,8 +1116,10 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
             <button 
               key={s}
               onClick={() => s <= step && setStep(s)}
-              disabled={s > step && s !== 8}
-              className={`group relative w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${
+              disabled={s > step}
+              aria-label={`Go to ${labels[s]} step`}
+              aria-current={step === s ? 'step' : undefined}
+              className={`group relative w-11 h-11 shrink-0 flex items-center justify-center rounded-xl transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600 ${
                 step === s 
                   ? 'bg-brand-teal text-white shadow-lg shadow-brand-teal/30' 
                   : step > s 
@@ -1138,8 +1141,34 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         })}
       </div>
 
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[220px_minmax(0,1fr)_340px] 2xl:grid-cols-[250px_minmax(0,1fr)_380px]">
+        <aside aria-label="Selected property information" className="min-w-0 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
+          <div className="flex items-center justify-between gap-2">
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-teal-700">Your listing</p><h3 className="mt-1 text-base font-bold text-slate-900">Property details</h3></div>
+            <button type="button" onClick={() => setStep(1)} className="rounded-lg px-2 py-1 text-xs font-bold text-teal-700 hover:bg-teal-50">Change</button>
+          </div>
+          {selectedProperty ? <>
+            <div className="mt-4 aspect-[4/3] overflow-hidden rounded-xl bg-slate-100">
+              {selectedProperty.images?.[0]?.image_url ? <img src={selectedProperty.images[0].image_url} alt={selectedProperty.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <div className="flex h-full items-center justify-center text-xs text-slate-500">No image uploaded</div>}
+            </div>
+            <p className="mt-4 text-sm font-bold leading-snug text-slate-900">{selectedProperty.title}</p>
+            <p className="mt-1 text-xs text-slate-500">{selectedProperty.location_area}, {selectedProperty.location_city}</p>
+            <p className="mt-3 text-xl font-black text-teal-700">R {selectedProperty.price.toLocaleString('en-ZA')}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 text-xs text-slate-600">
+              <span>{selectedProperty.bedrooms} bedrooms</span><span>{selectedProperty.bathrooms} bathrooms</span>
+              <span>{selectedProperty.parking} parking</span><span>{selectedProperty.floor_size_m2} m²</span>
+            </div>
+            {selectedProperty.short_description && <p className="mt-4 line-clamp-5 text-xs leading-5 text-slate-500">{selectedProperty.short_description}</p>}
+          </> : <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-xs leading-5 text-slate-500">Choose a property in the Property step to see its marketing information here.</div>}
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Agent</p>
+            {selectedAgent ? <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-700">{selectedAgent.full_name[0]}</span><span className="min-w-0 truncate text-xs font-semibold text-slate-800">{selectedAgent.full_name}</span></div> : <p className="text-xs text-slate-500">No agent selected yet.</p>}
+            <button type="button" onClick={() => setStep(6)} className="mt-3 rounded-lg text-xs font-bold text-teal-700 hover:underline">Select agent</button>
+          </div>
+        </aside>
+
       {/* Middle: Workspace */}
-      <div className="flex-1 flex flex-col gap-6 min-w-0">
+      <div className="min-w-0 flex flex-col gap-5">
         {/* Selection Summary Card (Context) */}
         {(selectedFormat || selectedProperty) && (
           <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -1191,8 +1220,8 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
           </div>
         )}
 
-        <div className="bg-white shadow-sm flex flex-col flex-1 overflow-hidden">
-          <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div className="min-w-0 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm flex flex-col flex-1">
+          <div className="px-5 sm:px-7 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
             <div>
               <h3 className="text-2xl font-serif italic leading-none">
                 {step === 0 ? 'Select Platform' : step === 1 ? 'Select Property' : step === 2 ? 'Post Type' : step === 3 ? 'Review Content' : step === 4 ? 'Select Media' : step === 5 ? 'Amenities' : step === 6 ? 'Choose Agent' : step === 7 ? 'Schedule Post' : 'Export Post'}
@@ -1262,6 +1291,16 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
             </div>
           )}
         </div>
+      </div>
+      <StudioPreview
+        config={config}
+        property={selectedProperty}
+        agent={selectedAgent}
+        branding={branding}
+        platformLabel={selectedFormat?.platform}
+        onEditContent={() => setStep(3)}
+        onSelectMedia={() => setStep(4)}
+      />
       </div>
     </div>
     </div>
