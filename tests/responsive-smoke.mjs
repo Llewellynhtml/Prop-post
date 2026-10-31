@@ -59,6 +59,13 @@ async function testWidth(width, height) {
     if (!(await page.getByRole('button', { name: 'Expand sidebar' }).isVisible())) issues.push(`${width}px: sidebar did not collapse`);
     await page.getByRole('button', { name: 'Expand sidebar' }).click();
   }
+  // Property Marketing Studio: verify the three panels render without page overflow.
+  await page.getByRole('button', { name: 'Create post' }).first().click();
+  await page.getByRole('heading', { name: 'Live branded draft' }).waitFor();
+  await page.getByRole('heading', { name: 'Property details' }).waitFor();
+  await page.screenshot({ path: `artifacts/responsive/studio-${width}.png`, fullPage: true });
+  const studioWidth = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  if (studioWidth.scroll > studioWidth.client + 1) issues.push(`${width}px: studio overflows horizontally by ${studioWidth.scroll - studioWidth.client}px`);
   if (errors.length) issues.push(`${width}px: runtime errors: ${errors.join('; ')}`);
   await context.close();
 }
