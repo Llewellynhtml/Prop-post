@@ -296,7 +296,7 @@ function AppContent() {
   );
 }
 
-function SidebarItem({ active, onClick, icon, label, collapsed, primary }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; collapsed: boolean; primary?: boolean }) {
+function SidebarItem({ active, onClick, icon, label, collapsed, primary }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; collapsed: boolean; primary?: boolean; key?: React.Key }) {
   return <button type="button" onClick={onClick} title={collapsed ? label : undefined}
     aria-current={active ? 'page' : undefined}
     className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-300 ${
