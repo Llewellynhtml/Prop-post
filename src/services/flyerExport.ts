@@ -1,5 +1,3 @@
-import html2canvas from 'html2canvas';
-
 export type FlyerFormat = 'png' | 'jpeg' | 'pdf';
 export type FlyerRatio = '1:1' | '4:5' | '9:16' | '1.91:1' | '16:9' | '1200x630';
 
@@ -14,44 +12,79 @@ const sizes: Record<FlyerRatio, { width: number; height: number }> = {
 
 
 /**
- * Tailwind 4 uses OKLCH and color-mix. html2canvas cannot parse modern CSS
- * colors, so snapshot each computed color through the browser's own Canvas2D
- * implementation and replace it with legacy RGBA inside the export clone.
- * The on-screen live preview is never changed.
+ * Render the SAME flyer DOM that powers the live preview. The browser's SVG
+ * foreignObject renderer understands CSS Color 4 (Tailwind OKLCH).
+ * Computed styles are copied inline so the exported image is independent of
+ * stylesheets after it leaves the page.
  */
-const normaliseCloneColors = (doc: Document) => {
-  const ctx = doc.createElement('canvas').getContext('2d', { willReadFrequently: true });
-  if (!ctx) return;
-  const toRgba = (value: string) => {
-    if (!value || value === 'none') return value;
-    try {
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = '#000000';
-      ctx.fillStyle = value;
-      ctx.fillRect(0, 0, 1, 1);
-      const data = ctx.getImageData(0, 0, 1, 1).data;
-      return `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${(data[3] / 255).toFixed(4)})`;
-    } catch { return '#000000'; }
-  };
-  const colorProperties = [
-    'color', 'background-color', 'border-top-color', 'border-right-color',
-    'border-bottom-color', 'border-left-color', 'outline-color',
-    'text-decoration-color', 'fill', 'stroke'
-  ];
-  // Also normalize ancestors because html2canvas copies inherited styles.
-  for (const element of doc.querySelectorAll('*')) {
-    if (!(element instanceof doc.defaultView!.HTMLElement) && !(element instanceof doc.defaultView!.SVGElement)) continue;
-    const styles = doc.defaultView!.getComputedStyle(element);
-    const inline = (element as HTMLElement).style;
-    for (const name of colorProperties) {
-      const current = styles.getPropertyValue(name);
-      if (current && current !== 'none' && current !== 'currentcolor') {
-        inline.setProperty(name, toRgba(current), 'important');
-      }
+const makeSelfContainedClone = async (source: HTMLElement): Promise<HTMLElement> => {
+  const cloned = source.cloneNode(true) as HTMLElement;
+  const originals = [source, ...Array.from(source.querySelectorAll('*'))];
+  const copies = [cloned, ...Array.from(cloned.querySelectorAll('*'))];
+  originals.forEach((original, i) => {
+    const target = copies[i] as HTMLElement | SVGElement;
+    const styles = getComputedStyle(original);
+    for (let n = 0; n < styles.length; n++) {
+      const property = styles.item(n);
+      target.style.setProperty(property, styles.getPropertyValue(property), 'important');
     }
-    inline.setProperty('box-shadow', 'none', 'important');
-    inline.setProperty('text-shadow', 'none', 'important');
-    inline.setProperty('filter', 'none', 'important');
+    target.style.setProperty('animation', 'none', 'important');
+    target.style.setProperty('transition', 'none', 'important');
+    target.style.setProperty('filter', 'none', 'important');
+  });
+
+  // An SVG image cannot load external assets. Inline photos and logos in the
+  // clone, and fail with a useful message if a server blocks CORS.
+  const sourceImages = Array.from(source.querySelectorAll('img'));
+  const cloneImages = Array.from(cloned.querySelectorAll('img'));
+  await Promise.all(sourceImages.map(async (image, i) => {
+    const url = image.currentSrc || image.src;
+    if (!url) return;
+    if (url.startsWith('data:')) {
+      cloneImages[i].src = url;
+      return;
+    }
+    let response: Response;
+    try { response = await fetch(url, { mode: 'cors', credentials: 'same-origin' }); }
+    catch { throw new Error('A property image or agency logo blocks cross-origin export. Host this image on an approved CORS-enabled origin.'); }
+    if (!response.ok) throw new Error(`Cannot load flyer image (HTTP ${response.status}).`);
+    const blob = await response.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('Image could not be encoded for flyer export.'));
+      reader.readAsDataURL(blob);
+    });
+    cloneImages[i].src = dataUrl;
+  }));
+  cloned.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  return cloned;
+};
+
+const renderPreviewCanvas = async (source: HTMLElement, width: number, height: number): Promise<HTMLCanvasElement> => {
+  const rect = source.getBoundingClientRect();
+  if (!rect.width || !rect.height) throw new Error('Flyer preview is not visible.');
+  const cloned = await makeSelfContainedClone(source);
+  const xml = new XMLSerializer().serializeToString(cloned);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}" viewBox="0 0 ${rect.width} ${rect.height}"><foreignObject x="0" y="0" width="100%" height="100%">${xml}</foreignObject></svg>`;
+  const imageUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+  try {
+    const image = new Image();
+    image.src = imageUrl;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas rendering is unavailable in this browser.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+    return canvas;
+  } catch {
+    throw new Error('Browser SVG rendering failed. Check that all flyer assets can be embedded.');
+  } finally {
+    URL.revokeObjectURL(imageUrl);
   }
 };
 
@@ -117,18 +150,7 @@ export async function exportFlyer(node: HTMLElement, ratio: FlyerRatio, format: 
   await Promise.all(images.map(img => img.decode().catch(() => {
     throw new Error('A flyer image could not load. Check its URL and cross-origin permissions.');
   })));
-  const sourceWidth = node.getBoundingClientRect().width;
-  const canvas = await html2canvas(node, {
-    backgroundColor: '#ffffff',
-    useCORS: true,
-    allowTaint: false,
-    imageTimeout: 15000,
-    logging: false,
-    onclone: normaliseCloneColors,
-    scale: size.width / sourceWidth,
-    width: sourceWidth,
-    height: sourceWidth * size.height / size.width
-  });
+  const canvas = await renderPreviewCanvas(node, size.width, size.height);
   if (canvas.width !== size.width || Math.abs(canvas.height - size.height) > 2) {
     throw new Error('Rendered dimensions do not match the selected format.');
   }
