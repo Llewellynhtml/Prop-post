@@ -6,8 +6,15 @@ await mkdir('artifacts/responsive', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const issues = [];
 const jwt = ['eyJhbGciOiJIUzI1NiJ9', Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, sub: 'ui-test' })).toString('base64url'), 'ui-test'].join('.');
+const fixtureProperty = {
+  id: 7, title: 'Test Townhouse', price: 1850000, currency: 'ZAR', listing_type: 'sale',
+  status: 'available', location_city: 'Kimberley', location_area: 'New Park',
+  bedrooms: 3, bathrooms: 2, parking: 2, floor_size_m2: 140, short_description: 'Test home',
+  images: [], amenities: [], created_at: '2026-10-01', updated_at: '2026-10-01'
+};
 const routes = {
-  '/api/properties': [],
+  '/api/properties': [fixtureProperty],
+  '/api/properties/7/full': { ...fixtureProperty, defaults: { defaultSelectedImages: [], defaultAmenitiesToShow: [], defaultHeadline: 'Test Townhouse', defaultCaption: 'Explore this townhouse' } },
   '/api/agents': [],
   '/api/branding': [],
   '/api/amenities': [],
@@ -73,6 +80,29 @@ async function testWidth(width, height) {
   await page.screenshot({ path: `artifacts/responsive/studio-${width}.png`, fullPage: true });
   const studioWidth = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   if (studioWidth.scroll > studioWidth.client + 1) issues.push(`${width}px: studio overflows horizontally by ${studioWidth.scroll - studioWidth.client}px`);
+  if (width === 1440) {
+    // Choose a real fixture through the guided flow. Then verify every format is a real download.
+    await page.getByRole('button', { name: /Instagram.*Stories, Reels/i }).click();
+    await page.getByRole('button', { name: /Post \(4:5\)/i }).click();
+    await page.getByRole('button', { name: /Test Townhouse/i }).click();
+    await page.getByText('Test Townhouse', { exact: true }).first().waitFor();
+    for (const format of ['PNG', 'JPEG', 'PDF']) {
+      const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
+      await page.getByRole('button', { name: `Download flyer as ${format}` }).click();
+      const download = await downloadPromise;
+      const filename = download.suggestedFilename();
+      const expected = format === 'JPEG' ? '.jpg' : `.${format.toLowerCase()}`;
+      if (!filename.endsWith(expected)) issues.push(`Unexpected ${format} filename: ${filename}`);
+      const failure = await download.failure();
+      if (failure) issues.push(`${format} download failed: ${failure}`);
+      const path = await download.path();
+      const data = await (await import('node:fs/promises')).readFile(path);
+      if (data.length < 100) issues.push(`${format} download unexpectedly small`);
+      if (format === 'PNG' && (data[0] !== 137 || data.readUInt32BE(16) !== 1080 || data.readUInt32BE(20) !== 1350)) issues.push('PNG dimensions or signature incorrect');
+      if (format === 'JPEG' && (data[0] !== 255 || data[1] !== 216)) issues.push('JPEG signature incorrect');
+      if (format === 'PDF' && !data.subarray(0, 8).toString().startsWith('%PDF-1.4')) issues.push('PDF header incorrect');
+    }
+  }
   if (errors.length) issues.push(`${width}px: runtime errors: ${errors.join('; ')}`);
   await context.close();
 }
