@@ -26,3 +26,25 @@ jobs:
         run: npm run lint
       - name: Production frontend build
         run: npm run build
+      - name: Install Playwright browser tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Start Vite preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/proppost-preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/proppost-preview.log
+          exit 1
+      - name: Test responsive dashboard in Chromium
+        run: node tests/responsive-smoke.mjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-screenshots
+          path: artifacts/responsive/
+          if-no-files-found: warn
