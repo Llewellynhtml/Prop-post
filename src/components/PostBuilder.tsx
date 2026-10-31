@@ -40,6 +40,7 @@ import TemplatePreview from './TemplatePreview';
 import TemplateLibrary from './TemplateLibrary';
 import PageHeader from './PageHeader';
 import StudioPreview from './StudioPreview';
+import { exportFlyer, type FlyerFormat, type FlyerRatio } from '../services/flyerExport';
 
 interface Props {
   properties: Property[];
@@ -95,6 +96,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
   const [isGenerating, setIsGenerating] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [studioMessage, setStudioMessage] = useState('');
+  const [isExportingFlyer, setIsExportingFlyer] = useState(false);
   const [propertySearch, setPropertySearch] = useState('');
 
   useEffect(() => {
@@ -310,6 +312,28 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setStudioMessage('Export prepared. Check your browser downloads.');
+  };
+
+  const handleFlyerExport = async (format: FlyerFormat) => {
+    if (!selectedProperty) {
+      setStudioMessage('Select a property before exporting artwork.');
+      return;
+    }
+    const node = document.getElementById('flyer-export-canvas');
+    if (!node) {
+      setStudioMessage('The flyer preview is unavailable.');
+      return;
+    }
+    setIsExportingFlyer(true);
+    setStudioMessage('');
+    try {
+      const result = await exportFlyer(node, config.activePreviewPlatform as FlyerRatio, format, `proppost-${selectedProperty.id}-${config.activePreviewPlatform.replace(/[^a-zA-Z0-9]/g, '-')}`);
+      setStudioMessage(`Exported ${result.name} at ${result.width} × ${result.height} pixels.`);
+    } catch (error) {
+      setStudioMessage(error instanceof Error ? error.message : 'Flyer export failed. Please retry.');
+    } finally {
+      setIsExportingFlyer(false);
+    }
   };
 
   const copyCaption = async () => {
@@ -1017,6 +1041,9 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
             <h3 className="text-2xl font-serif italic">Export property post</h3>
             <p className="text-sm text-gray-500 max-w-md mx-auto">Download your caption or structured post data. Image and video downloads require a separate validated rendering pipeline.</p>
             {studioMessage && <p role="status" className="rounded-xl bg-teal-50 p-3 text-sm text-teal-900">{studioMessage}</p>}
+            <div className="grid grid-cols-3 gap-2 max-w-md mx-auto">
+              {(['png', 'jpeg', 'pdf'] as const).map(format => <button key={format} type="button" disabled={isExportingFlyer || !selectedProperty} onClick={() => handleFlyerExport(format)} className="rounded-xl bg-teal-700 py-3 text-xs font-bold uppercase text-white disabled:opacity-50">{format === 'jpeg' ? 'JPG' : format.toUpperCase()}</button>)}
+            </div>
             <div className="grid grid-cols-1 gap-3 pt-8 max-w-md mx-auto">
               <button type="button" onClick={() => exportPost('txt')} className="w-full bg-brand-teal text-white py-4 rounded-xl font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Download size={18} /> Download caption (.txt)</button>
               <button type="button" onClick={() => exportPost('json')} className="w-full border border-gray-200 py-4 rounded-xl font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Download size={18} /> Export post data (.json)</button>
@@ -1302,6 +1329,9 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         onEditContent={() => setStep(3)}
         onSelectMedia={() => setStep(4)}
         onUpdateConfig={(next) => setConfig(previous => ({ ...previous, ...next }))}
+        onExport={handleFlyerExport}
+        isExporting={isExportingFlyer}
+        exportDisabled={!selectedProperty}
       />
       </div>
     </div>
