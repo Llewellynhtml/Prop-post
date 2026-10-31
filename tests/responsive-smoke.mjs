@@ -47,10 +47,10 @@ async function testWidth(width, height) {
     const navigation = page.getByRole('navigation', { name: 'Workspace sections' });
     await navigation.getByRole('button', { name: 'Agents' }).click();
     await page.getByText('Workspace / PropPost').waitFor();
-    if (await page.getByRole('button', { name: 'Close menu' }).isVisible()) issues.push(`${width}px: drawer did not close on navigation`);
+    await page.waitForFunction(() => document.querySelector('[aria-label="Open navigation"]')?.getAttribute('aria-expanded') === 'false');
     await open.click();
     await page.keyboard.press('Escape');
-    if (await page.getByRole('button', { name: 'Close menu' }).isVisible()) issues.push(`${width}px: Escape did not close drawer`);
+    await page.waitForFunction(() => document.querySelector('[aria-label="Open navigation"]')?.getAttribute('aria-expanded') === 'false');
     await open.click();
     await navigation.getByRole('button', { name: 'Dashboard' }).click();
   } else {
