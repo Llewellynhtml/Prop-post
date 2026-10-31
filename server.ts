@@ -45,9 +45,11 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // Static Files
-  app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
-  app.use("/uploads/posts", express.static(path.join(__dirname, "public/uploads/posts")));
+  // Local media is development-only. Production must use tenant-scoped object
+  // storage with authorized access, not a public directory.
+  if (process.env.NODE_ENV !== "production") {
+    app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+  }
 
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
