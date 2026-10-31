@@ -85,6 +85,10 @@ export interface PostConfig {
   propertyId: number;
   agentId: number;
   templateId: number;
+  previewLayout?: 'editorial' | 'classic' | 'minimal';
+  logoPosition?: 'top-left' | 'top-right';
+  showLogo?: boolean;
+  showAgent?: boolean;
   selectedAmenities: string[];
   selectedFacts: {
     price: boolean;
