@@ -116,6 +116,9 @@ async function testWidth(width, height) {
     await page.getByText(/Spacious Three-Bedroom Townhouse/).first().waitFor();
     await page.getByRole('heading', { name: 'Live branded draft' }).waitFor();
     await page.waitForTimeout(800); // allow the wizard's motion transition to settle
+    if (await page.getByLabel('Agency logo').count() === 0) {
+      throw new Error('Studio preview disappeared after property selection. Page errors: ' + errors.join(' / ') + '; body: ' + (await page.locator('body').innerText()).slice(-800));
+    }
     await page.getByLabel('Agency logo').check({ force: true });
     await page.getByLabel('Agent details').check({ force: true });
     await page.getByRole('button', { name: 'Select agent' }).click();
