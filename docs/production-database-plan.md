@@ -36,3 +36,18 @@ Only if the host supports a Node.js 22 backend with:
 - Set API rate limiting, body/upload size validation, audit events, secrets rotation, error redaction and backup recovery before public launch.
 
 **Release gate:** keep PR #1, #2 and #3 unmerged and the Hostinger deployment unchanged until these checks are met.
+
+## Durable media storage migration contract
+
+Current local `/upload` and `/posts/media` endpoints are deliberately blocked in production until a tenant-safe provider is implemented. Public `/uploads/**` serving is also disabled in production.
+
+Recommended object storage is a private S3-compatible bucket or managed object storage service with:
+- Object prefix `agencies/<verified-agency-uuid>/properties/<property-id>/<random-object-id>` or equivalent agency-scoped paths; prefix comes from the authenticated server-side agency, **never from the request body**.
+- A database `media_assets` record with `id, agency_id, property_id?, owner_user_id, object_key, mime_type, bytes, checksum, created_at`; prohibit cross-tenant object references with both query checks and constraints.
+- Explicit MIME allowlist plus server-side file signature validation, size caps, malware scanning policy, random object keys, and image metadata stripping where appropriate.
+- Private bucket by default; authenticated, short-lived signed GET/PUT URLs. If public marketing imagery is required, issue narrow public renditions and cache them through a controlled CDN.
+- Controlled CORS to the approved app origin(s) and only the required methods/headers. Ensure images used for canvas exports are fetchable with suitable CORS response headers.
+- Cleanup/reconciliation job to remove orphaned objects after deleting media records, with audit logs, versioning and retention for recovery.
+- A deployment migration that copies existing local files with checksums, records agency ownership, verifies references, then atomically switches URLs; never assume a legacy public filename proves ownership.
+
+No object storage service, credentials or bucket was provisioned by this PR. A provider selection and staging environment are required before enabling production uploads.
