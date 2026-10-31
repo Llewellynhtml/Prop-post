@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import db from "../config/db.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) throw new Error("JWT_SECRET must be configured (at least 32 characters)");
+  return secret;
+};
 
 export interface AuthRequest extends Request {
   user?: {
@@ -16,41 +21,23 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
-  if (!token) {
-    // Development bypass: if no token is provided, assume admin role for now
-    if (process.env.NODE_ENV !== "production") {
-      try {
-        const db = (await import("../config/db.js")).default;
-        const agency = db.prepare("SELECT id FROM agencies LIMIT 1").get() as { id: string };
-        const agencyId = agency?.id || "dev-agency-id";
-        req.user = { id: 1, email: "admin@proppost.co.za", role: "admin", agency_id: agencyId };
-        return next();
-      } catch (e) {
-        req.user = { id: 1, email: "admin@proppost.co.za", role: "admin", agency_id: "dev-agency-id" };
-        return next();
-      }
-    }
-    return res.status(401).json({ error: "Access denied. No token provided." });
-  }
+  if (!token) return res.status(401).json({ error: "Access denied. No token provided." });
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    req.user = decoded;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
+    // JWT claims can be stale after an account is disabled or moved.
+    // Resolve current role and agency membership from the database.
+    const identity = Number(decoded.id);
+    if (!Number.isSafeInteger(identity) || identity <= 0) {
+      return res.status(403).json({ error: "Invalid account identity." });
+    }
+    const active = db.prepare("SELECT id, email, role, agency_id FROM users WHERE id = ?").get(identity) as AuthRequest['user'] | undefined;
+    if (!active?.agency_id || active.email !== decoded.email || active.agency_id !== decoded.agency_id) {
+      return res.status(403).json({ error: "Account access has changed. Sign in again." });
+    }
+    req.user = active;
     next();
   } catch (error) {
-    // Development bypass: if token is invalid, still allow in dev
-    if (process.env.NODE_ENV !== "production") {
-      try {
-        const db = (await import("../config/db.js")).default;
-        const agency = db.prepare("SELECT id FROM agencies LIMIT 1").get() as { id: string };
-        const agencyId = agency?.id || "dev-agency-id";
-        req.user = { id: 1, email: "admin@proppost.co.za", role: "admin", agency_id: agencyId };
-        return next();
-      } catch (e) {
-        req.user = { id: 1, email: "admin@proppost.co.za", role: "admin", agency_id: "dev-agency-id" };
-        return next();
-      }
-    }
     res.status(403).json({ error: "Invalid or expired token." });
   }
 };

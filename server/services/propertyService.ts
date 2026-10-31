@@ -78,6 +78,9 @@ export const propertyService = {
     const { title, price, location_city, location_area, bedrooms, bathrooms, parking, floor_size_m2, short_description, listing_type, agent_id, amenities, images } = data;
     
     const transaction = db.transaction(() => {
+      if (agent_id != null && !db.prepare("SELECT id FROM agents WHERE id = ? AND agency_id = ?").get(agent_id, agencyId)) {
+        throw new Error("Agent does not belong to this agency");
+      }
       const result = db.prepare(`
         INSERT INTO properties (agency_id, title, price, location_city, location_area, bedrooms, bathrooms, parking, floor_size_m2, short_description, listing_type, agent_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -105,6 +108,11 @@ export const propertyService = {
     const { title, price, location_city, location_area, bedrooms, bathrooms, parking, floor_size_m2, short_description, listing_type, agent_id, amenities, images } = data;
     
     const transaction = db.transaction(() => {
+      const owned = db.prepare("SELECT id FROM properties WHERE id = ? AND agency_id = ?").get(id, agencyId);
+      if (!owned) return false;
+      if (agent_id != null && !db.prepare("SELECT id FROM agents WHERE id = ? AND agency_id = ?").get(agent_id, agencyId)) {
+        throw new Error("Agent does not belong to this agency");
+      }
       db.prepare(`
         UPDATE properties 
         SET title = ?, price = ?, location_city = ?, location_area = ?, bedrooms = ?, bathrooms = ?, parking = ?, floor_size_m2 = ?, short_description = ?, listing_type = ?, agent_id = ?, updated_at = CURRENT_TIMESTAMP

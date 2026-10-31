@@ -20,9 +20,15 @@ import leadRoutes from "./server/routes/leads.js";
 import analyticsRoutes from "./server/routes/analytics.js";
 import agencyRoutes from "./server/routes/agencies.js";
 import campaignRoutes from "./server/routes/campaigns.js";
+import aiRoutes from "./server/routes/ai.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Fail fast rather than running an API with missing signing credentials.
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error("JWT_SECRET must be configured with at least 32 characters");
+}
 
 // Initialize Database
 initDb();
@@ -39,12 +45,17 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // Static Files
-  app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
-  app.use("/uploads/posts", express.static(path.join(__dirname, "public/uploads/posts")));
+  // Local media is development-only. Production must use tenant-scoped object
+  // storage with authorized access, not a public directory.
+  if (process.env.NODE_ENV !== "production") {
+    app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+  }
+
+  app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
   // API Routes
   app.use("/api/auth", authRoutes);
+  app.use("/api/ai", aiRoutes);
   app.use("/api/properties", propertyRoutes);
   app.use("/api/agents", agentRoutes);
   app.use("/api/amenities", amenityRoutes);

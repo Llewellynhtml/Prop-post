@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
@@ -8,8 +9,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // The DB file should be in the root relative to this file
-const dbPath = path.join(__dirname, "../../proppost.db");
+const dbPath = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.join(__dirname, "../../proppost.db");
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
+db.pragma("busy_timeout = 5000");
 
 // Initialize Database with comprehensive schema
 export const initDb = () => {
@@ -289,196 +296,39 @@ export const initDb = () => {
     );
   `);
 
-  // Seed initial data if empty
-  const agencyCount = db.prepare("SELECT COUNT(*) as count FROM agencies").get() as { count: number };
+  // Development fixtures are opt-in. Real tenants start with empty properties
+  // and metrics; never manufacture successful social posts or leads.
+  const demoMode = process.env.SEED_DEMO_DATA === "true" && process.env.NODE_ENV !== "production";
   let defaultAgencyId = "";
-
-  if (agencyCount.count === 0) {
+  const existingAgency = db.prepare("SELECT id FROM agencies ORDER BY created_at LIMIT 1").get() as { id: string } | undefined;
+  if (existingAgency) defaultAgencyId = existingAgency.id;
+  if (!existingAgency) {
     defaultAgencyId = randomUUID();
-    db.prepare(`
-      INSERT INTO agencies (id, name, logo_url, primary_color, secondary_color)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(defaultAgencyId, "GroupTen Agency", "https://picsum.photos/seed/agency/400/200", "#1E97AB", "#359288");
-  } else {
-    const agency = db.prepare("SELECT id FROM agencies LIMIT 1").get() as { id: string };
-    defaultAgencyId = agency.id;
-  }
-
-  const propertyCount = db.prepare("SELECT COUNT(*) as count FROM properties").get() as { count: number };
-  if (propertyCount.count === 0) {
-    // Seed Amenities
-    const initialAmenities = [
-      "4 Spacious Bedrooms", "2 Modern Bathrooms", "Open-plan Living Room", "Fully Equipped Kitchen",
-      "Dining Area", "Built-in Wardrobes", "Air Conditioning", "Ceiling Fans", "Modern Lighting Fixtures",
-      "Tiled or Wooden Floors", "1 Garage / Covered Parking", "Secure Parking Area", "Private Entrance",
-      "Storage Room", "Laundry Area", "Walk-in Closet", "Guest Bathroom", "Private Garden",
-      "Landscaped Yard", "Outdoor Patio", "Balcony", "Swimming Pool", "Braai Area / BBQ Area",
-      "Outdoor Lighting", "Security Gates", "Electric Fence", "Alarm System", "CCTV Cameras",
-      "Intercom System", "Burglar Bars", "24/7 Security", "High-Speed Internet Ready", "Fibre Internet",
-      "Smart TV Ready", "Solar Power Option", "Backup Power / Inverter", "Water Tank",
-      "Energy Efficient Windows", "Ensuite Bathroom", "Modern Kitchen Island", "Granite Countertops",
-      "Double Garage", "Home Office", "Entertainment Area", "Fireplace"
-    ];
-    const insertAmenity = db.prepare("INSERT INTO amenities (name) VALUES (?)");
-    initialAmenities.forEach(a => insertAmenity.run(a));
-
-    // Seed Agents
-    const insertAgent = db.prepare(`
-      INSERT INTO agents (agency_id, full_name, role_optional, profile_photo_url, email, whatsapp_number, cellphone_number, linkedin_url_optional, instagram_url_optional)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    [
-      [defaultAgencyId, "Sarah Jenkins", "Senior Property Consultant", "https://picsum.photos/seed/agent1/400/400", "sarah@groupten.co.za", "27821234567", "27821234567", "https://linkedin.com/in/sarahjenkins", "https://instagram.com/sarahjenkins_realty"],
-      [defaultAgencyId, "Mark Thompson", "Leasing Specialist", "https://picsum.photos/seed/agent2/400/400", "mark@groupten.co.za", "27827654321", "27827654321", "https://linkedin.com/in/markthompson", "https://instagram.com/mark_leasing"],
-      [defaultAgencyId, "Elena Rodriguez", "Luxury Portfolio Manager", "https://picsum.photos/seed/agent3/400/400", "elena@groupten.co.za", "27829998888", "27829998888", "https://linkedin.com/in/elenarodriguez", "https://instagram.com/elena_luxury_homes"]
-    ].forEach(a => insertAgent.run(...a));
-
-    // Seed Branding
-    db.prepare(`
-      INSERT INTO branding (agency_id, company_name, logo_url, primary_color_hex, secondary_color_hex, accent_color_hex, background_color_hex, heading_font_family, body_font_family, website_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      defaultAgencyId,
-      "GroupTen Properties",
-      "https://picsum.photos/seed/logo/400/200",
-      "#1E97AB",
-      "#359288",
-      "#518E58",
-      "#FEFEFE",
-      "Montserrat",
-      "Montserrat",
-      "www.groupten.co.za"
+    db.prepare("INSERT INTO agencies (id, name) VALUES (?, ?)").run(
+      defaultAgencyId, process.env.BOOTSTRAP_AGENCY_NAME || "Initial Agency"
     );
-
-    // Seed Properties
-    const insertProp = db.prepare(`
-      INSERT INTO properties (agency_id, title, price, location_city, location_area, bedrooms, bathrooms, parking, floor_size_m2, short_description, listing_type, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const properties = [
-      [defaultAgencyId, "Luxury Ocean View Villa", 8500000, "Cape Town", "Camps Bay", 4, 3, 2, 350, "A stunning modern villa with panoramic ocean views.", "sale", "available"],
-      [defaultAgencyId, "Modern Penthouse", 4500000, "Johannesburg", "Sandton", 2, 2, 2, 120, "Chic urban living in the heart of Sandton.", "sale", "available"],
-      [defaultAgencyId, "Family Home with Garden", 3200000, "Durban", "Umhlanga", 3, 2, 2, 200, "Perfect family home with a spacious garden and pool.", "sale", "available"],
-      [defaultAgencyId, "Cozy Studio Apartment", 12000, "Cape Town", "Sea Point", 1, 1, 1, 45, "Fully furnished studio steps away from the promenade.", "rent", "available"],
-      [defaultAgencyId, "Executive Office Suite", 25000, "Pretoria", "Brooklyn", 0, 2, 4, 150, "Prime office space in a secure business park.", "rent", "available"]
-    ];
-
-    properties.forEach(p => {
-      const result = insertProp.run(...p);
-      const propertyId = result.lastInsertRowid;
-
-      // Link Amenities with priority scores
-      const amenityIds = db.prepare("SELECT id FROM amenities").all() as { id: number }[];
-      const linkAmenity = db.prepare("INSERT INTO property_amenities (property_id, amenity_id, priority_score) VALUES (?, ?, ?)");
-      amenityIds.forEach((a, i) => {
-        if (Math.random() > 0.7) {
-          linkAmenity.run(propertyId, a.id, Math.floor(Math.random() * 100));
-        }
-      });
-
-      // Seed Images
-      const insertImage = db.prepare("INSERT INTO property_images (property_id, image_url, is_hero, sort_order) VALUES (?, ?, ?, ?)");
-      for (let i = 0; i < 6; i++) {
-        insertImage.run(propertyId, `https://picsum.photos/seed/prop${propertyId}_${i}/1920/1080`, i === 0 ? 1 : 0, i);
-      }
-    });
   }
-
-  // Seed Templates (Wipe first to ensure exactly 2 as requested)
-  db.prepare("DELETE FROM templates").run();
-  db.prepare("DELETE FROM sqlite_sequence WHERE name='templates'").run();
-  const insertTemplate = db.prepare(`
-    INSERT INTO templates (agency_id, name, category, style_theme, supported_formats, thumbnail_url, description, tags, listing_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  const templates = [
-    [defaultAgencyId, "Premium Real Estate Flyer", "for_sale", "luxury", JSON.stringify(["1200x630"]), "https://picsum.photos/seed/flyer/1200/630", "Premium, Modular, Luxury, Facebook", "for_sale", "active"],
-    [defaultAgencyId, "Exclusive Living Flyer", "for_sale", "luxury", JSON.stringify(["1200x630", "16:9"]), "https://picsum.photos/seed/exclusive/1100/620", "Exclusive, Luxury, Gold, Navy", "for_sale", "active"]
-  ];
-
-  templates.forEach(t => insertTemplate.run(...t));
-
-  // Seed Analytics and more Leads if empty
-  const analyticsCount = db.prepare("SELECT COUNT(*) as count FROM post_analytics").get() as { count: number };
-  if (analyticsCount.count === 0) {
-    let posts = db.prepare("SELECT id, property_id, agent_id FROM scheduled_posts").all() as any[];
-    
-    // If no posts, let's create some dummy ones first to have data to analyze
-    if (posts.length === 0) {
-      const properties = db.prepare("SELECT id, title FROM properties").all() as any[];
-      const agents = db.prepare("SELECT id, full_name FROM agents").all() as any[];
-      
-      const insertPost = db.prepare(`
-        INSERT INTO scheduled_posts (agency_id, property_id, agent_id, property_title, agent_name, platforms, status, date, time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      const platforms = ['facebook', 'instagram', 'linkedin'];
-      properties.forEach((p, i) => {
-        const agent = agents[i % agents.length];
-        const result = insertPost.run(
-          defaultAgencyId,
-          p.id, 
-          agent.id, 
-          p.title, 
-          agent.full_name, 
-          JSON.stringify([platforms[i % platforms.length]]), 
-          'posted',
-          '2024-03-01',
-          '10:00'
-        );
-        posts.push({ id: result.lastInsertRowid, property_id: p.id, agent_id: agent.id });
-      });
+  if (demoMode) {
+    console.log("[Database] Demo fixture seeding enabled for development.");
+    const propertyCount = db.prepare("SELECT COUNT(*) as count FROM properties").get() as { count: number };
+    if (propertyCount.count === 0) {
+      const insertProp = db.prepare("INSERT INTO properties (agency_id, title, price, location_city, location_area, listing_type) VALUES (?, ?, ?, ?, ?, ?)");
+      insertProp.run(defaultAgencyId, "EXAMPLE • Demo property", 1250000, "Kimberley", "Central", "sale");
     }
-
-    const insertAnalytics = db.prepare(`
-      INSERT INTO post_analytics (post_id, platform, likes, comments, shares, clicks, impressions)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const insertLead = db.prepare(`
-      INSERT INTO leads (agency_id, property_id, post_id, agent_id, source, contact_name, contact_phone, message)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    posts.forEach(post => {
-      const platform = 'facebook'; // Simplified for seeding
-      insertAnalytics.run(
-        post.id,
-        platform,
-        Math.floor(Math.random() * 50),
-        Math.floor(Math.random() * 10),
-        Math.floor(Math.random() * 5),
-        Math.floor(Math.random() * 100),
-        Math.floor(Math.random() * 1000) + 500
-      );
-
-      // Add a lead for some posts
-      if (Math.random() > 0.3) {
-        insertLead.run(
-          defaultAgencyId,
-          post.property_id,
-          post.id,
-          post.agent_id,
-          platform,
-          "John Doe",
-          "0821234567",
-          "I am interested in this property."
-        );
-      }
-    });
   }
 
-  // Seed default admin user if no users exist
+  // Bootstrap only with explicit, server-side credentials.
   const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get() as { count: number };
-  if (userCount.count === 0) {
-    const passwordHash = bcrypt.hashSync("admin123", 10);
+  if (userCount.count === 0 && process.env.BOOTSTRAP_ADMIN_EMAIL && process.env.BOOTSTRAP_ADMIN_PASSWORD) {
+    if (process.env.BOOTSTRAP_ADMIN_PASSWORD.length < 12) {
+      throw new Error("BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters");
+    }
+    const passwordHash = bcrypt.hashSync(process.env.BOOTSTRAP_ADMIN_PASSWORD, 12);
     db.prepare(`
       INSERT INTO users (agency_id, name, email, password_hash, role)
       VALUES (?, ?, ?, ?, ?)
-    `).run(defaultAgencyId, "System Admin", "admin@proppost.co.za", passwordHash, "admin");
-    console.log("Default admin user created: admin@proppost.co.za / admin123");
+    `).run(defaultAgencyId, "System Admin", process.env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase().trim(), passwordHash, "admin");
+    console.log("Initial administrator created from secure environment configuration");
   }
 };
 
