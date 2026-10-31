@@ -36,13 +36,13 @@ function shortDate(date: string, time?: string) {
   return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function StatTile({ label, value, icon, detail, onClick }: { label: string; value: number; icon: React.ReactNode; detail: string; onClick: () => void }) {
+function StatTile({ label, value, icon, detail, onClick }: { label: string; value: number | null; icon: React.ReactNode; detail: string; onClick: () => void }) {
   return <button onClick={onClick} className={`${card} group p-5 text-left transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600`}>
     <div className="flex items-start justify-between gap-3">
       <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 group-hover:bg-teal-50 group-hover:text-teal-700">{icon}</span>
       <ArrowUpRight size={17} className="text-slate-300 group-hover:text-teal-600" aria-hidden />
     </div>
-    <p className="mt-5 text-3xl font-bold tracking-tight text-slate-900 tabular-nums">{numberFormat.format(value)}</p>
+    <p className="mt-5 text-3xl font-bold tracking-tight text-slate-900 tabular-nums">{value === null ? '—' : numberFormat.format(value)}</p>
     <p className="mt-1 text-sm font-semibold text-slate-800">{label}</p>
     <p className="mt-1 text-xs text-slate-500">{detail}</p>
   </button>;
@@ -91,10 +91,10 @@ export default function Dashboard({ stats, scheduledPosts, topProperties, recent
         <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500">{dataError ? 'Data unavailable' : 'Agency data'}</span>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Properties" value={stats.totalProperties} detail="Listings in your workspace" icon={<Home size={21}/>} onClick={() => onNavigate('properties')}/>
-        <StatTile label="Active campaigns" value={stats.activeCampaigns} detail="Campaigns reported by the API" icon={<Megaphone size={21}/>} onClick={() => onNavigate('analytics')}/>
-        <StatTile label="Leads recorded" value={stats.totalLeads} detail="Inquiries captured by the agency" icon={<Users size={21}/>} onClick={() => onNavigate('leads')}/>
-        <StatTile label="Scheduled posts" value={stats.scheduledPosts} detail="Planned marketing activity" icon={<CalendarDays size={21}/>} onClick={() => onNavigate('scheduled')}/>
+        <StatTile label="Properties" value={dataError ? null : stats.totalProperties} detail="Listings in your workspace" icon={<Home size={21}/>} onClick={() => onNavigate('properties')}/>
+        <StatTile label="Active campaigns" value={dataError ? null : stats.activeCampaigns} detail="Campaigns reported by the API" icon={<Megaphone size={21}/>} onClick={() => onNavigate('analytics')}/>
+        <StatTile label="Leads recorded" value={dataError ? null : stats.totalLeads} detail="Inquiries captured by the agency" icon={<Users size={21}/>} onClick={() => onNavigate('leads')}/>
+        <StatTile label="Scheduled posts" value={dataError ? null : stats.scheduledPosts} detail="Planned marketing activity" icon={<CalendarDays size={21}/>} onClick={() => onNavigate('scheduled')}/>
       </div>
     </section>
 
