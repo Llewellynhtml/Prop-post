@@ -8,17 +8,12 @@ import {
   PlusCircle, 
   Library, 
   History as HistoryIcon, 
-  Settings,
-  ChevronDown,
-  Search,
-  Bell,
   Menu,
+  X,
   LogOut,
-  User as UserIcon,
   Calendar,
   TrendingUp,
   Layout,
-  Layers,
   Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -53,10 +48,15 @@ function AppContent() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const fetchData = async () => {
     if (!token) return;
+    setDashboardLoading(true);
+    setDashboardError(null);
     try {
       const headers = {
         'Authorization': `Bearer ${token}`
@@ -98,6 +98,9 @@ function AppContent() {
       setDashboardData(dashboardData);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setDashboardError("The agency API could not return all dashboard data.");
+    } finally {
+      setDashboardLoading(false);
     }
   };
 
@@ -122,6 +125,8 @@ function AppContent() {
           topProperties={dashboardData?.topProperties || []} 
           leadsPerAgent={dashboardData?.leadsPerAgent || []} 
           recentActivity={dashboardData?.recentActivity || []}
+          dataError={dashboardError}
+          dataLoading={dashboardLoading}
           onNavigate={setView} 
         />
       );
@@ -150,167 +155,138 @@ function AppContent() {
           topProperties={dashboardData?.topProperties || []} 
           leadsPerAgent={dashboardData?.leadsPerAgent || []} 
           recentActivity={dashboardData?.recentActivity || []}
+          dataError={dashboardError}
+          dataLoading={dashboardLoading}
           onNavigate={setView} 
         />
       );
     }
   };
 
+
+  const navigateTo = (destination: View) => {
+    setView(destination);
+    setIsMobileMenuOpen(false);
+  };
+
+  const sections: { label: string; items: { view: View; label: string; icon: React.ReactNode; primary?: boolean }[] }[] = [
+    { label: 'Overview', items: [{ view: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> }] },
+    { label: 'Listings & content', items: [
+      { view: 'properties', label: 'Properties', icon: <Home size={18} /> },
+      { view: 'media', label: 'Media library', icon: <Library size={18} /> },
+      { view: 'templates', label: 'Templates', icon: <Layout size={18} /> }
+    ] },
+    { label: 'Agency', items: [
+      { view: 'agents', label: 'Agents', icon: <Users size={18} /> },
+      { view: 'amenities', label: 'Amenities', icon: <Sparkles size={18} /> },
+      { view: 'branding', label: 'Branding', icon: <Palette size={18} /> }
+    ] },
+    { label: 'Marketing', items: [
+      { view: 'builder', label: 'Post Builder', icon: <PlusCircle size={18} />, primary: true },
+      { view: 'leads', label: 'Leads', icon: <Users size={18} /> },
+      { view: 'scheduled', label: 'Schedule', icon: <Calendar size={18} /> },
+      { view: 'history', label: 'History', icon: <HistoryIcon size={18} /> },
+      { view: 'analytics', label: 'Analytics', icon: <TrendingUp size={18} /> }
+    ] }
+  ];
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [isMobileMenuOpen]);
+
+  const currentLabel = sections.flatMap(section => section.items).find(item => item.view === view)?.label
+    || (view === 'agency-settings' ? 'Agency settings' : 'Dashboard');
+
   return (
-    <div className="min-h-screen bg-brand-white flex text-[#1A1A1A] font-sans">
-      {/* Sidebar */}
-      <aside className={`bg-[#080809] text-white flex flex-col transition-all duration-500 z-50 sticky top-0 h-screen border-r border-white/[0.05] ${isSidebarOpen ? 'w-[260px]' : 'w-20'}`}>
-        <div className="h-20 flex items-center px-5 gap-3 border-b border-white/[0.05] bg-black/20">
-          <div className="w-10 h-10 bg-brand-teal rounded-xl flex items-center justify-center font-bold text-xl shadow-lg shadow-brand-teal/20 shrink-0 relative group overflow-hidden">
-            <span className="relative z-10 text-white">P</span>
-          </div>
-          {isSidebarOpen && (
-            <div className="flex flex-col">
-              <span className="font-bold text-xl tracking-tight leading-none text-white">PropPost</span>
-              <span className="text-[8px] font-mono font-bold text-brand-teal uppercase tracking-[0.2em] mt-1 opacity-70">Marketing Platform</span>
-            </div>
-          )}
+    <div className="flex min-h-screen bg-[#f5f7f9] text-slate-900">
+      {isMobileMenuOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-[2px] md:hidden"
+        />
+      )}
+      <aside
+        id="primary-navigation"
+        aria-label="Primary navigation"
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-[#101d25] text-white shadow-2xl transition-[transform,width] duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 md:shadow-none ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} w-[280px] ${isSidebarOpen ? 'md:w-[264px]' : 'md:w-[78px]'}`}
+      >
+        <div className="flex h-[76px] shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4">
+          <button type="button" onClick={() => navigateTo('dashboard')} aria-label="PropPost dashboard" className="flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-300">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#20b7a4] text-xl font-black text-[#0c2426]">P</span>
+            <span className={`min-w-0 ${isSidebarOpen ? 'md:block' : 'md:hidden'}`}>
+              <span className="block text-lg font-bold tracking-tight">PropPost<span className="text-teal-300">.</span></span>
+              <span className="block text-[10px] font-medium tracking-[0.13em] text-slate-400">REAL ESTATE MARKETING</span>
+            </span>
+          </button>
+          <button type="button" onClick={() => setIsMobileMenuOpen(false)} aria-label="Close menu" className="rounded-lg p-2 text-slate-300 hover:bg-white/10 md:hidden"><X size={20}/></button>
         </div>
 
-        <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto custom-scrollbar">
-          {/* OVERVIEW */}
-          <div className="pb-2">
-            {isSidebarOpen && (
-              <div className="px-3 mb-1">
-                <p className="text-[8px] font-mono font-bold uppercase tracking-[0.2em] text-white/20">Overview</p>
+        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-5 custom-scrollbar" aria-label="Workspace sections">
+          {sections.map(section => (
+            <div key={section.label}>
+              <p className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 ${isSidebarOpen ? 'md:block' : 'md:sr-only'}`}>{section.label}</p>
+              <div className="space-y-1">
+                {section.items.map(item => (
+                  <SidebarItem key={item.view} label={item.label} icon={item.icon} active={view === item.view}
+                    collapsed={!isSidebarOpen} primary={item.primary} onClick={() => navigateTo(item.view)} />
+                ))}
               </div>
-            )}
-            <SidebarItem active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={16} />} label="Dashboard" collapsed={!isSidebarOpen} />
-          </div>
-
-          {/* CONTENT */}
-          <div className="pb-2 border-t border-white/[0.03] pt-2">
-            {isSidebarOpen && (
-              <div className="px-3 mb-1">
-                <p className="text-[8px] font-mono font-bold uppercase tracking-[0.2em] text-white/20">Content</p>
-              </div>
-            )}
-            <SidebarItem active={view === 'properties'} onClick={() => setView('properties')} icon={<Home size={16} />} label="Properties" collapsed={!isSidebarOpen} />
-            <SidebarItem active={view === 'media'} onClick={() => setView('media')} icon={<Library size={16} />} label="Media Library" collapsed={!isSidebarOpen} />
-            <SidebarItem active={view === 'templates'} onClick={() => setView('templates')} icon={<Layout size={16} />} label="Templates" collapsed={!isSidebarOpen} />
-          </div>
-
-          {/* TEAM */}
-          <div className="pb-2 border-t border-white/[0.03] pt-2">
-            {isSidebarOpen && (
-              <div className="px-3 mb-1">
-                <p className="text-[8px] font-mono font-bold uppercase tracking-[0.2em] text-white/20">Team</p>
-              </div>
-            )}
-            <SidebarItem active={view === 'agents'} onClick={() => setView('agents')} icon={<Users size={16} />} label="Agents" collapsed={!isSidebarOpen} />
-            <SidebarItem active={view === 'amenities'} onClick={() => setView('amenities')} icon={<Sparkles size={16} />} label="Amenities" collapsed={!isSidebarOpen} />
-            <SidebarItem active={view === 'branding'} onClick={() => setView('branding')} icon={<Palette size={16} />} label="Branding" collapsed={!isSidebarOpen} />
-          </div>
-
-          {/* MARKETING */}
-          <div className="pb-2 border-t border-white/[0.03] pt-2">
-            {isSidebarOpen && (
-              <div className="px-3 mb-1">
-                <p className="text-[8px] font-mono font-bold uppercase tracking-[0.2em] text-white/20">Marketing</p>
-              </div>
-            )}
-            <SidebarItem active={view === 'builder'} onClick={() => setView('builder')} icon={<PlusCircle size={16} />} label="Post Builder" collapsed={!isSidebarOpen} primary />
-            <SidebarItem active={view === 'leads'} onClick={() => setView('leads')} icon={<Users size={16} />} label="Leads" collapsed={!isSidebarOpen} />
-            <SidebarItem active={view === 'scheduled'} onClick={() => setView('scheduled')} icon={<Calendar size={16} />} label="Scheduled" collapsed={!isSidebarOpen} />
-            <SidebarItem active={view === 'history'} onClick={() => setView('history')} icon={<HistoryIcon size={16} />} label="History" collapsed={!isSidebarOpen} />
-            <SidebarItem active={view === 'analytics'} onClick={() => setView('analytics')} icon={<TrendingUp size={16} />} label="Analytics" collapsed={!isSidebarOpen} />
-          </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="p-3 border-t border-white/[0.05] bg-black/20 space-y-3">
-          {/* User Account Area */}
-          <div className={`flex items-center gap-2.5 p-2 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-colors cursor-pointer group ${!isSidebarOpen ? 'justify-center' : ''}`}>
-            <div className="w-7 h-7 bg-brand-teal rounded flex items-center justify-center text-white font-bold text-[10px] shrink-0">
-              {user?.name?.[0] || 'U'}
-            </div>
-            {isSidebarOpen && (
-              <div className="flex flex-col min-w-0">
-                <span className="text-[11px] font-bold text-white truncate">{user?.name || 'Mpho Ronald'}</span>
-                <span className="text-[7px] font-mono text-white/30 uppercase tracking-widest">{user?.role || 'Admin'}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-0.5">
-            {user?.role === 'admin' && (
-              <SidebarItem active={view === 'agency-settings'} onClick={() => setView('agency-settings')} icon={<Building2 size={16} />} label="Agency" collapsed={!isSidebarOpen} />
-            )}
-            <SidebarItem active={view === 'settings'} onClick={() => setView('settings')} icon={<Settings size={16} />} label="Settings" collapsed={!isSidebarOpen} />
-            <SidebarItem active={false} onClick={logout} icon={<LogOut size={16} />} label="Logout" collapsed={!isSidebarOpen} />
+        <div className="shrink-0 border-t border-white/10 p-3">
+          {user?.role === 'admin' && (
+            <SidebarItem icon={<Building2 size={18}/>} label="Agency settings" active={view === 'agency-settings'} collapsed={!isSidebarOpen} onClick={() => navigateTo('agency-settings')} />
+          )}
+          <SidebarItem icon={<LogOut size={18}/>} label="Sign out" active={false} collapsed={!isSidebarOpen} onClick={() => { setIsMobileMenuOpen(false); logout(); }} />
+          <div className={`mt-3 flex items-center gap-3 rounded-xl bg-white/[0.06] p-3 ${isSidebarOpen ? 'md:flex' : 'md:justify-center'}`}>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-sm font-bold text-teal-200">{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
+            <span className={`min-w-0 ${isSidebarOpen ? 'md:block' : 'md:hidden'}`}>
+              <span className="block truncate text-xs font-semibold text-white">{user?.name || 'Account'}</span>
+              <span className="block truncate text-[11px] capitalize text-slate-400">{user?.role || 'User'}</span>
+            </span>
           </div>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar */}
-        <header className="h-20 bg-white/80 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-10 sticky top-0 z-40">
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-              className="w-10 h-10 flex items-center justify-center hover:bg-gray-50 rounded-xl transition-all active:scale-90"
-            >
-              <Menu size={20} className="text-gray-400" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur-lg sm:px-6 lg:px-9">
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" aria-label="Open navigation" aria-expanded={isMobileMenuOpen} aria-controls="primary-navigation"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="rounded-xl border border-slate-200 p-2.5 text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600 md:hidden">
+              <Menu size={20}/>
             </button>
-            <div className="h-6 w-px bg-gray-100"></div>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.3em]">Current View</span>
-              <div className="flex items-center gap-2">
-                <span className="capitalize font-bold text-gray-900">{view.replace('-', ' ')}</span>
-                {view === 'builder' && (
-                  <>
-                    <span className="text-gray-300">/</span>
-                    <span className="text-brand-teal font-medium">Studio</span>
-                  </>
-                )}
-              </div>
+            <button type="button" aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={isSidebarOpen}
+              onClick={() => setIsSidebarOpen(value => !value)}
+              className="hidden rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600 md:inline-flex">
+              <Menu size={19}/>
+            </button>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Workspace / PropPost</p>
+              <h1 className="truncate text-base font-bold tracking-tight text-slate-900 sm:text-lg">{currentLabel}</h1>
             </div>
           </div>
-
-          <div className="flex items-center gap-8">
-            <div className="relative hidden md:block group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-teal transition-colors" size={16} />
-              <input 
-                type="text" 
-                placeholder="Search engine..." 
-                className="pl-12 pr-6 py-2.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm w-72 focus:ring-4 focus:ring-brand-teal/5 focus:border-brand-teal focus:bg-white transition-all outline-none" 
-              />
-            </div>
-            
-            <div className="flex items-center gap-4 border-l border-gray-100 pl-8">
-              <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-brand-teal hover:bg-brand-teal/5 rounded-xl relative transition-all">
-                <Bell size={20} />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand-teal rounded-full border-2 border-white"></span>
-              </button>
-              
-              <div className="flex items-center gap-3 pl-4 py-1.5 pr-1.5 bg-gray-50 border border-gray-100 rounded-2xl hover:border-brand-teal/30 transition-all cursor-pointer group">
-                <div className="flex flex-col items-end hidden lg:block">
-                  <p className="text-[11px] font-bold text-gray-900 leading-none group-hover:text-brand-teal transition-colors">{user?.name || 'Mpho Ronald'}</p>
-                  <p className="text-[9px] text-gray-400 mt-1 uppercase tracking-widest font-bold">{user?.role || 'Admin'}</p>
-                </div>
-                <div className="w-8 h-8 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-[10px] shadow-md group-hover:scale-105 transition-transform">
-                  {user?.name?.[0] || 'M'}
-                </div>
-              </div>
-            </div>
+          <div className="flex shrink-0 items-center gap-3">
+            {view !== 'builder' && <button type="button" onClick={() => navigateTo('builder')}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0e8278] px-3 py-2.5 text-xs font-bold text-white transition hover:bg-[#0a665e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600 sm:px-4 sm:text-sm">
+              <PlusCircle size={17}/><span className="hidden sm:inline">Create post</span><span className="sm:hidden">Create</span>
+            </button>}
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700 ring-1 ring-slate-200" title={user?.name || 'Account'}>{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
           </div>
         </header>
-
-        {/* View Container */}
-        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        <main id="main-content" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               {renderView()}
             </motion.div>
           </AnimatePresence>
@@ -320,37 +296,16 @@ function AppContent() {
   );
 }
 
-function SidebarItem({ active, onClick, icon, label, collapsed, primary }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, collapsed: boolean, primary?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 group relative overflow-hidden ${
-        active 
-          ? primary 
-            ? 'bg-brand-teal text-white shadow-lg shadow-brand-teal/20' 
-            : 'bg-white/[0.08] text-white' 
-          : primary 
-            ? 'bg-brand-teal/5 text-brand-teal hover:bg-brand-teal/10' 
-            : 'text-white/40 hover:text-white hover:bg-white/[0.04]'
-      }`}
-    >
-      <div className={`relative z-10 ${active ? 'scale-110' : 'group-hover:scale-110'} transition-transform duration-300 shrink-0`}>
-        {icon}
-      </div>
-      
-      {!collapsed && (
-        <span className="relative z-10 text-xs font-bold tracking-wide truncate">
-          {label}
-        </span>
-      )}
-
-      {collapsed && (
-        <div className="absolute left-full ml-4 px-3 py-2 bg-[#121214] text-white text-[9px] font-bold uppercase tracking-[0.1em] rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-50 pointer-events-none shadow-xl border border-white/[0.05]">
-          {label}
-        </div>
-      )}
-    </button>
-  );
+function SidebarItem({ active, onClick, icon, label, collapsed, primary }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; collapsed: boolean; primary?: boolean; key?: React.Key }) {
+  return <button type="button" onClick={onClick} title={collapsed ? label : undefined}
+    aria-current={active ? 'page' : undefined}
+    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-300 ${
+      active ? 'bg-teal-400/15 text-teal-200' : primary ? 'text-teal-300 hover:bg-teal-400/10' : 'text-slate-400 hover:bg-white/[0.07] hover:text-white'
+    }`}>
+    <span className="shrink-0">{icon}</span>
+    <span className={`truncate ${collapsed ? 'md:sr-only' : ''}`}>{label}</span>
+    {active && <span className={`ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-teal-300 ${collapsed ? 'md:hidden' : ''}`} />}
+  </button>;
 }
 
 export default function App() {
