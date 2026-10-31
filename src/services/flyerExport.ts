@@ -67,7 +67,7 @@ const renderPreviewCanvas = async (source: HTMLElement, width: number, height: n
   const cloned = await makeSelfContainedClone(source);
   const xml = new XMLSerializer().serializeToString(cloned);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}" viewBox="0 0 ${rect.width} ${rect.height}"><foreignObject x="0" y="0" width="100%" height="100%">${xml}</foreignObject></svg>`;
-  const imageUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+  const imageUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   try {
     const image = new Image();
     image.src = imageUrl;
@@ -83,8 +83,6 @@ const renderPreviewCanvas = async (source: HTMLElement, width: number, height: n
     return canvas;
   } catch {
     throw new Error('Browser SVG rendering failed. Check that all flyer assets can be embedded.');
-  } finally {
-    URL.revokeObjectURL(imageUrl);
   }
 };
 
