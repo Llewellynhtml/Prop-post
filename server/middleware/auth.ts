@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import db from "../config/db.js";
 
 const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
@@ -24,7 +25,17 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
   try {
     const decoded = jwt.verify(token, getJwtSecret()) as any;
-    req.user = decoded;
+    // JWT claims can be stale after an account is disabled or moved.
+    // Resolve current role and agency membership from the database.
+    const identity = Number(decoded.id);
+    if (!Number.isSafeInteger(identity) || identity <= 0) {
+      return res.status(403).json({ error: "Invalid account identity." });
+    }
+    const active = db.prepare("SELECT id, email, role, agency_id FROM users WHERE id = ?").get(identity) as AuthRequest['user'] | undefined;
+    if (!active?.agency_id || active.email !== decoded.email || active.agency_id !== decoded.agency_id) {
+      return res.status(403).json({ error: "Account access has changed. Sign in again." });
+    }
+    req.user = active;
     next();
   } catch (error) {
     res.status(403).json({ error: "Invalid or expired token." });
