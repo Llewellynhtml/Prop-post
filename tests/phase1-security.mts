@@ -13,6 +13,9 @@ delete process.env.BOOTSTRAP_ADMIN_PASSWORD;
 try {
   const { default: db, initDb } = await import('../server/config/db.ts');
   const { propertyService } = await import('../server/services/propertyService.ts');
+  const { leadService } = await import('../server/services/leadService.ts');
+  const { scheduleService } = await import('../server/services/scheduleService.ts');
+  const { assertAgencyReferences } = await import('../server/services/tenantGuard.ts');
   initDb();
 
   assert.equal(db.prepare('PRAGMA foreign_keys').get().foreign_keys, 1, 'Foreign key enforcement required');
@@ -36,6 +39,13 @@ try {
   assert.equal(propertyService.getById(targetId, firstAgency), null, 'Cross-tenant read must be rejected');
   assert.equal(propertyService.update(targetId, { ...payload, title: 'Updated title' }, secondAgency), true);
   assert.equal(db.prepare('SELECT title FROM properties WHERE id = ?').get(targetId).title, 'Updated title');
+  assert.throws(() => assertAgencyReferences(firstAgency, [{ table: 'properties', id: targetId }]), /inaccessible/);
+  assert.throws(() => leadService.create({ propertyId: Number(targetId), source: 'website', contactName: 'Test', contactPhone: '0820000000' }, firstAgency), /inaccessible/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM leads').get().n, 0);
+  await assert.rejects(() => scheduleService.create({ propertyId: Number(targetId), platforms: ['facebook'], date: '2027-01-01', time: '12:00' }, firstAgency), /inaccessible/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM scheduled_posts').get().n, 0);
+  const planned = await scheduleService.create({ propertyId: Number(targetId), platforms: ['facebook'], date: '2027-01-01', time: '12:00' }, secondAgency);
+  assert.equal(db.prepare('SELECT publish_status FROM scheduled_posts WHERE id = ?').get(planned).publish_status, 'manual_required');
   db.close();
   console.log('Phase 1 security checks passed: tenant boundaries, SQLite integrity, and no fabricated data.');
 } finally {
