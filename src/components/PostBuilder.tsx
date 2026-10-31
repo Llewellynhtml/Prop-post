@@ -93,6 +93,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [studioMessage, setStudioMessage] = useState('');
   const [propertySearch, setPropertySearch] = useState('');
 
   useEffect(() => {
@@ -235,7 +236,13 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
       }
     }
 
+    if (scheduleConfig.mode !== 'later') {
+      setStudioMessage('Automatic publishing is not connected. Export your content for manual publishing.');
+      setStep(8);
+      return;
+    }
     setIsScheduling(true);
+    setStudioMessage('');
     try {
       const scheduledPost: ScheduledPost = {
         propertyId: config.propertyId,
@@ -244,7 +251,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         caption: config.captionOverride || '',
         imageURL: config.selectedImages[0],
         videoURL: config.videoUrl,
-        status: scheduleConfig.mode === 'now' ? 'posted' : 'scheduled',
+        status: 'scheduled',
         date: scheduleConfig.date,
         time: scheduleConfig.time,
         createdAt: new Date().toISOString(),
@@ -260,42 +267,57 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         body: JSON.stringify(scheduledPost)
       });
 
-      if (!res.ok) throw new Error('Failed to schedule post');
-      
-      setStep(7); // Move to Export/Success step
+      if (!res.ok) throw new Error('Failed to save planned post');
+      setStudioMessage('Added to your marketing schedule. This does not publish to social media.');
+      onComplete();
+      setStep(8);
     } catch (error) {
       console.error("Error scheduling post:", error);
-      alert('Failed to schedule post. Please try again.');
+      setStudioMessage('Scheduling failed. You may still export your content manually.');
+      setStep(8);
     } finally {
       setIsScheduling(false);
     }
   };
 
-  const handleExport = async () => {
-    const exportPromises = config.selectedPlatforms.map(platformId => {
-      const platform = PLATFORMS.find(p => p.id === platformId);
-      return fetch('/api/history', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          property_id: config.propertyId,
-          agent_id: config.agentId,
-          brand_id: branding.id,
-          template_id: config.templateId,
-          platform: platform?.name,
-          aspect_ratio: platformId,
-          style: selectedTemplate?.name || config.layoutStyle,
-          thumbnail_url: config.selectedImages[0]
-        })
-      });
+  const exportPost = (format: 'txt' | 'json') => {
+    if (!selectedProperty) {
+      setStudioMessage('Choose a property before exporting.');
+      return;
+    }
+    const payload = {
+      property: selectedProperty.title,
+      location: `${selectedProperty.location_area}, ${selectedProperty.location_city}`,
+      price: selectedProperty.price,
+      agent: selectedAgent?.full_name || '',
+      platform: selectedFormat?.platform || '',
+      caption: config.captionOverride || '',
+      headline: config.headlineOverride || selectedProperty.title,
+      cta: config.ctaOverride || '',
+      media: config.selectedImages
+    };
+    const text = [payload.headline, payload.caption, payload.cta].filter(Boolean).join('\n\n');
+    const blob = new Blob([format === 'json' ? JSON.stringify(payload, null, 2) : text], {
+      type: format === 'json' ? 'application/json' : 'text/plain;charset=utf-8'
     });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `proppost-${selectedProperty.id}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStudioMessage('Export prepared. Check your browser downloads.');
+  };
 
-    await Promise.all(exportPromises);
-    onComplete();
-    setStep(6);
+  const copyCaption = async () => {
+    try {
+      await navigator.clipboard.writeText(config.captionOverride || '');
+      setStudioMessage('Caption copied.');
+    } catch {
+      setStudioMessage('Unable to copy. Use the text download instead.');
+    }
   };
 
   const renderStepContent = () => {
@@ -985,21 +1007,20 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
             </div>
           </div>
         );
-      case 7: // Export
+      case 8: // Export
         return (
           <div className="space-y-8 text-center py-12">
             <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 size={40} />
             </div>
-            <h3 className="text-2xl font-serif italic">Post Ready!</h3>
-            <p className="text-sm text-gray-500 max-w-xs mx-auto">Your branded creative has been generated and saved to history.</p>
-            <div className="grid grid-cols-1 gap-3 pt-8">
-              <button className="w-full bg-brand-teal text-white py-4 rounded-xl font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-dark-teal transition-all shadow-lg shadow-brand-teal/20">
-                <Download size={18} /> Download PNG
-              </button>
-              <button className="w-full border border-gray-200 py-4 rounded-xl font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-50 transition-all">
-                <Copy size={18} /> Copy HTML
-              </button>
+            <h3 className="text-2xl font-serif italic">Export property post</h3>
+            <p className="text-sm text-gray-500 max-w-md mx-auto">Download your caption or structured post data. Image and video downloads require a separate validated rendering pipeline.</p>
+            {studioMessage && <p role="status" className="rounded-xl bg-teal-50 p-3 text-sm text-teal-900">{studioMessage}</p>}
+            <div className="grid grid-cols-1 gap-3 pt-8 max-w-md mx-auto">
+              <button type="button" onClick={() => exportPost('txt')} className="w-full bg-brand-teal text-white py-4 rounded-xl font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Download size={18} /> Download caption (.txt)</button>
+              <button type="button" onClick={() => exportPost('json')} className="w-full border border-gray-200 py-4 rounded-xl font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Download size={18} /> Export post data (.json)</button>
+              <button type="button" onClick={copyCaption} className="w-full border border-gray-200 py-4 rounded-xl font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Copy size={18} /> Copy caption</button>
+              <button type="button" onClick={() => setStep(7)} className="text-sm text-teal-700 underline">Back to scheduling</button>
             </div>
           </div>
         );
@@ -1011,11 +1032,11 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
     <div className="flex flex-col gap-8 h-full relative">
       <PageHeader 
         title="Post Builder" 
-        subtitle="Create and schedule high-converting social media content"
+        subtitle="Create branded real estate marketing posts, then preview and export"
         action={
           <div className="flex items-center gap-4">
             <div className="flex items-center bg-gray-100 p-1 rounded-xl">
-              {[0, 1, 2, 3, 4, 5, 6].map((s) => (
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                 <div 
                   key={s}
                   className={`w-2 h-2 rounded-full mx-1.5 transition-all ${step === s ? 'bg-brand-teal scale-125' : s < step ? 'bg-brand-teal/40' : 'bg-gray-300'}`}
@@ -1026,7 +1047,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         }
       />
 
-      <div className="flex gap-8 h-[calc(100vh-280px)] relative">
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:gap-6 relative">
       <AnimatePresence>
         {isLibraryOpen && (
           <motion.div 
@@ -1068,8 +1089,8 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
       </AnimatePresence>
 
       {/* Left: Steps Rail */}
-      <div className="w-20 shrink-0 flex flex-col items-center gap-4 py-4 bg-white shadow-sm">
-        {[0, 1, 2, 3, 4, 5, 6, 7].map(s => {
+      <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto rounded-2xl bg-white p-3 shadow-sm lg:w-20 lg:flex-col lg:overflow-visible lg:py-4">
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(s => {
           const isVideo = selectedFormat?.type === 'video';
           const isSkipped = isVideo && [2].includes(s); // Only skip Template for video
           if (isSkipped) return null;
@@ -1084,10 +1105,11 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
             <ImageIcon size={20} />,
             <ToggleRight size={20} />,
             <User size={20} />,
-            <Clock size={20} />
+            <Clock size={20} />,
+            <Download size={20} />
           ];
 
-          const labels = ['Platform', 'Property', 'Post Type', 'Content', 'Media', 'Amenities', 'Agent', 'Schedule'];
+          const labels = ['Platform', 'Property', 'Post Type', 'Content', 'Media', 'Amenities', 'Agent', 'Schedule', 'Export'];
 
           return (
             <button 
@@ -1120,7 +1142,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
       <div className="flex-1 flex flex-col gap-6 min-w-0">
         {/* Selection Summary Card (Context) */}
         {(selectedFormat || selectedProperty) && (
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-8">
               {selectedFormat && (
                 <div className="flex items-center gap-4 pr-8 border-r border-gray-100">
@@ -1173,13 +1195,13 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
           <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <div>
               <h3 className="text-2xl font-serif italic leading-none">
-                {step === 0 ? 'Select Platform' : step === 1 ? 'Select Property' : step === 2 ? 'Post Type' : step === 3 ? 'Review Content' : step === 4 ? 'Select Media' : step === 5 ? 'Amenities' : step === 6 ? 'Choose Agent' : 'Schedule Post'}
+                {step === 0 ? 'Select Platform' : step === 1 ? 'Select Property' : step === 2 ? 'Post Type' : step === 3 ? 'Review Content' : step === 4 ? 'Select Media' : step === 5 ? 'Amenities' : step === 6 ? 'Choose Agent' : step === 7 ? 'Schedule Post' : 'Export Post'}
               </h3>
-              <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-2">Step {step + 1} of 8 • PropPost Platform</p>
+              <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-2">Step {step + 1} of 9 • PropPost Platform</p>
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10 custom-scrollbar">
             <motion.div
               key={step}
               initial={{ opacity: 0, y: 10 }}
@@ -1190,8 +1212,8 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
             </motion.div>
           </div>
 
-          {step < 7 && (
-            <div className="px-8 py-6 border-t border-gray-100 flex justify-between items-center bg-gray-50/50">
+          {step < 8 && (
+            <div className="px-4 sm:px-8 py-5 border-t border-gray-100 flex flex-wrap gap-4 justify-between items-center bg-gray-50/50">
               <button 
                 onClick={() => setStep(s => Math.max(0, s - 1))}
                 disabled={step === 0}
@@ -1202,7 +1224,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
               
               <div className="flex items-center gap-8">
                 <div className="hidden md:flex gap-1">
-                  {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                     <div key={i} className={`w-8 h-1 rounded-full transition-all ${i === step ? 'bg-brand-teal w-12' : i < step ? 'bg-emerald-400' : 'bg-gray-200'}`}></div>
                   ))}
                 </div>
@@ -1210,7 +1232,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
                 <button 
                   onClick={() => {
                     if (step === 7) {
-                      handleSchedulePost();
+                      setStep(8);
                     } else {
                       setStep(s => s + 1);
                     }
@@ -1221,7 +1243,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
                     (step === 0 && !selectedFormat) || 
                     (step === 1 && !config.propertyId) || 
                     (step === 6 && !config.agentId) || 
-                    (step === 4 && config.selectedImages.length < 3 && selectedFormat?.type !== 'video') || 
+                    (step === 4 && config.selectedImages.length < 1 && selectedFormat?.type !== 'video') || 
                     (step === 4 && selectedFormat?.type === 'video' && !config.videoUrl)
                   }
                   className={`px-10 py-4 text-white rounded-2xl text-xs font-mono uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-2xl disabled:opacity-20 disabled:grayscale ${step === 7 ? 'bg-[#1E97AB] hover:bg-[#167a8b]' : 'bg-black hover:bg-brand-teal'}`}
@@ -1231,7 +1253,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
                   ) : isScheduling ? (
                     <RefreshCw className="animate-spin" size={18} />
                   ) : step === 7 ? (
-                    'Schedule Post'
+                    'Review export'
                   ) : (
                     'Continue'
                   )} <ArrowRight size={18} />
