@@ -14,11 +14,12 @@ interface Props {
   onExport: (format: 'png' | 'jpeg' | 'pdf') => void;
   isExporting?: boolean;
   exportDisabled?: boolean;
+  exportMessage?: string;
 }
 const ratioMap: Record<string, string> = { '1:1': '1 / 1', '4:5': '4 / 5', '9:16': '9 / 16', '1.91:1': '1.91 / 1', '16:9': '16 / 9', '1200x630': '1.91 / 1' };
 const safeColor = (value: string | undefined, fallback: string) => value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
 
-export default function StudioPreview({ config, property, agent, branding, platformLabel, onEditContent, onSelectMedia, onUpdateConfig, onExport, isExporting = false, exportDisabled = false }: Props) {
+export default function StudioPreview({ config, property, agent, branding, platformLabel, onEditContent, onSelectMedia, onUpdateConfig, onExport, isExporting = false, exportDisabled = false, exportMessage = '' }: Props) {
   const hero = config.selectedImages[0] || property?.images?.[0]?.image_url;
   const accent = safeColor(branding?.primary_color_hex, '#0e8278');
   const secondary = safeColor(branding?.accent_color_hex, '#1f2937');
@@ -98,6 +99,7 @@ export default function StudioPreview({ config, property, agent, branding, platf
         <button type="button" onClick={onEditContent} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Edit content</button>
         <button type="button" onClick={onSelectMedia} className="rounded-xl bg-[#0e8278] px-3 py-2.5 text-xs font-bold text-white hover:bg-[#0a665e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">Change media</button>
       </div>
+      {exportMessage && <p role="status" className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-800">{exportMessage}</p>}
       <div className="border-t border-slate-100 pt-3">
         <p className="mb-2 text-[11px] font-bold text-slate-700">Export this preview</p>
         <div className="grid grid-cols-3 gap-2">
