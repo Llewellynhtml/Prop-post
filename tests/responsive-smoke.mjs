@@ -63,6 +63,13 @@ async function testWidth(width, height) {
   await page.getByRole('button', { name: /^Create(?: post)?$/ }).first().click();
   await page.getByRole('heading', { name: 'Live branded draft' }).waitFor();
   await page.getByRole('heading', { name: 'Property details' }).waitFor();
+  const flyer = page.locator('[data-testid="flyer-canvas"]');
+  await page.getByLabel('Flyer layout').selectOption('classic');
+  if (await flyer.getAttribute('data-layout') !== 'classic') issues.push(`${width}px: changing flyer layout did not update canvas`);
+  await page.getByLabel('Preview format').selectOption('4:5');
+  if (await flyer.getAttribute('data-format') !== '4:5') issues.push(`${width}px: changing format did not update canvas`);
+  await page.getByLabel('Agency logo').uncheck();
+  await page.getByLabel('Agent details').uncheck();
   await page.screenshot({ path: `artifacts/responsive/studio-${width}.png`, fullPage: true });
   const studioWidth = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   if (studioWidth.scroll > studioWidth.client + 1) issues.push(`${width}px: studio overflows horizontally by ${studioWidth.scroll - studioWidth.client}px`);
