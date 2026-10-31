@@ -1332,6 +1332,7 @@ export default function PostBuilder({ properties, agents, branding, amenities, o
         onExport={handleFlyerExport}
         isExporting={isExportingFlyer}
         exportDisabled={!selectedProperty}
+        exportMessage={studioMessage}
       />
       </div>
     </div>
